@@ -1,0 +1,38 @@
+End-to-end runs on synthetic inputs (2026-10-01), previous vs updated scripts.
+
+Inputs had the real layout:
+  mouse: 95 mice (19/9/25/13/5/12/12), 82 ROIs
+  human: 54 people with BIDS labels 1-58 and gaps, 121 ROIs
+Permutations were reduced to keep the runs short:
+  n_permutations = 199
+  NBS_PERMUTATIONS = 40
+Environment: Python 3.11, SciPy 1.17.1, statsmodels 0.15.0, networkx 3.6.1, bctpy 0.6.1.
+
+Both versions of both scripts finished and wrote the same set of output files
+(47 for the mouse script).
+
+Edgewise statistics, merged on the ROI pair:
+  mouse, 8 pairwise files:  max |dt| <= 5.3e-15
+  mouse, omnibus:           max |dF| 1.7e-13
+  human, pairwise:          max |dt| 1.3e-15
+  human, omnibus:           max |dF| 1.4e-14
+  p_raw: median |dp| 0.01-0.035 at 199 permutations (Monte Carlo resolution 0.005)
+
+NBS:
+  - Observed components were identical in every comparison and direction
+    (same nodes and edge counts; mouse: all 51 components; human: the 6
+    largest, which were the ones compared).
+  - p_FWER differed only through the random stream (40 permutations).
+
+Graph metrics (mouse):
+  - Changed only through the threshold, which now keeps one edge fewer per
+    density.
+  - Largest differences: global efficiency 0.007, transitivity 0.004,
+    mean clustering 0.008.
+
+Rerun after the pairwise contrasts were switched to the ordinary Welch t-test
+(scipy.stats.ttest_ind, equal_var=False). Same synthetic inputs and reduced
+permutations as above.
+  - Both scripts finished and wrote the same set of files as the previous version.
+  - Pairwise t: max |dt| 5.3e-15 (mouse), 1.3e-15 (human).
+  - analysis_manifest.txt now states which test is used for each step.

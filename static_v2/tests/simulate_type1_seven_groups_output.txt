@@ -1,0 +1,5 @@
+variance pattern (SD of n=5 group)      F perm  Welch perm Welch param  F param
+all equal                                  0.048     0.051     0.063     0.049
+n=5 group SD 3                             0.239     0.064     0.067     0.238
+n=5 group SD 0.33                          0.034     0.046     0.060     0.035
+mixed 0.5-2                                0.208     0.072     0.060     0.208

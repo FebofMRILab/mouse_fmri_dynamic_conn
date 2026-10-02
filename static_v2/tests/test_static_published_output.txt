@@ -1,0 +1,19 @@
+S1 Welch F: scipy / statsmodels vs previous (max rel. diff)               5.365e-16  PASS  
+S2 Welch t: scipy vs previous (max diff)                                  8.882e-16  PASS  
+S3a edgewise Welch F: max |F diff|                                        3.553e-15  PASS  
+S3b edgewise Welch F perm. p: max |dp| in SDs of a difference                 2.718  report  max |dp| = 0.0236; time old 2.5s, scipy 0.5s
+S3c 9 vs 5 Welch t: max |t diff|                                                  0  PASS  
+S3d 9 vs 5: previous permutation p vs Welch t-test p: max |dp|              0.05269  report  the pairwise contrasts now use the ordinary Welch t-test (see S4)
+S3e welch_t_test equals scipy.stats.ttest_ind(equal_var=False)                    0  PASS  
+S4 n=9 vs 5, SD of n=5 group x1: type I, pooled t perm.                       0.052  report  Welch t perm. 0.054; Welch t parametric 0.061 (nominal 0.05; 2000 null datasets)
+S4 n=9 vs 5, SD of n=5 group x3: type I, pooled t perm.                      0.1145  report  Welch t perm. 0.101; Welch t parametric 0.052 (nominal 0.05; 2000 null datasets)
+S4 n=9 vs 5, SD of n=5 group x0.33: type I, pooled t perm.                    0.021  report  Welch t perm. 0.026; Welch t parametric 0.039 (nominal 0.05; 2000 null datasets)
+S4 n=19 vs 5, SD of n=5 group x3: type I, pooled t perm.                      0.206  report  Welch t perm. 0.133; Welch t parametric 0.054 (nominal 0.05; 2000 null datasets)
+S4 n=19 vs 5, SD of n=5 group x0.33: type I, pooled t perm.                  0.0035  report  Welch t perm. 0.020; Welch t parametric 0.049 (nominal 0.05; 2000 null datasets)
+S5 threshold: edges kept by previous code but not by BCT (max)                    1  report  previous keeps ceil(p*E), BCT round(p*E); every BCT edge is also in the previous set
+S6 nodal efficiency: networkx harmonic/(n-1) vs previous (max diff)       4.441e-16  PASS  
+S7 NBS: null, components and p reproduced from scipy t + extents                  0  PASS  components found: [('positive', 25, 0.0033), ('negative', 2, 0.8738), ('negative', 1, 1.0), ('negative', 1, 1.0)]
+S8 NBS with nothing above threshold: no component, null returned                  0  PASS  
+S9 NBS previous vs patched bctpy: identical observed components                   0  PASS  nulls differ only by random stream: 95th pct extent previous 7 vs bctpy 7; top p 0.0010 vs 0.0010
+
+17 checks, 0 failed

@@ -1,0 +1,13 @@
+design                       pooled perm  Welch perm Welch param Student param
+norm n=9 vs 5, SD x1               0.051       0.054       0.057         0.057
+norm n=9 vs 5, SD x3               0.107       0.097       0.054         0.134
+norm n=9 vs 5, SD x0.33            0.025       0.033       0.055         0.020
+norm n=19 vs 5, SD x3              0.206       0.129       0.049         0.256
+norm n=19 vs 5, SD x0.33           0.003       0.023       0.045         0.003
+norm n=25 vs 19, SD x2             0.077       0.059       0.058         0.079
+logn n=9 vs 5, SD x1               0.044       0.042       0.034         0.036
+logn n=9 vs 5, SD x3               0.168       0.145       0.124         0.170
+logn n=9 vs 5, SD x0.33            0.062       0.080       0.079         0.069
+logn n=19 vs 5, SD x3              0.269       0.188       0.133         0.283
+logn n=19 vs 5, SD x0.33           0.018       0.050       0.042         0.023
+logn n=25 vs 19, SD x2             0.095       0.077       0.076         0.090

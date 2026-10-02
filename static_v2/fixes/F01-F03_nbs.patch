@@ -1,0 +1,63 @@
+--- bctpy_nbs_original_0.6.1.py	2026-10-01 12:32:44.623225442 -0400
++++ bctpy_nbs_welch.py	2026-10-01 12:32:44.634300113 -0400
+@@ -1,10 +1,14 @@
++# Network-based statistic: bctpy 0.6.1 bct/nbs.py (Zalesky et al. 2010; GPLv3+),
++# copied unchanged except for the marked lines F01-F03 and absolute imports.
++# The exact differences are in fixes/F01-F03_nbs.patch; the evidence for each
++# is in CHANGES.md.
+ from __future__ import division, print_function
+ import numpy as np
+ 
+-from .utils import BCTParamError, get_rng
+-from .algorithms import get_components
+-from .due import due, BibTeX
+-from .citations import ZALESKY2010
++from bct.utils import BCTParamError, get_rng
++from bct.algorithms import get_components
++from bct.due import due, BibTeX
++from bct.citations import ZALESKY2010
+ 
+ # FIXME considerable gains could be realized using vectorization, although
+ # generating the null distribution will take a while
+@@ -103,9 +107,8 @@
+     def ttest2_stat_only(x, y, tail):
+         t = np.mean(x) - np.mean(y)
+         n1, n2 = len(x), len(y)
+-        s = np.sqrt(((n1 - 1) * np.var(x, ddof=1) + (n2 - 1)
+-                     * np.var(y, ddof=1)) / (n1 + n2 - 2))
+-        denom = s * np.sqrt(1 / n1 + 1 / n2)
++        # F01 (Welch t; Welch 1947; Janssen 1997; Chung & Romano 2013):
++        denom = np.sqrt(np.var(x, ddof=1) / n1 + np.var(y, ddof=1) / n2)
+         if denom == 0:
+             return 0
+         if tail == 'both':
+@@ -169,8 +172,8 @@
+     # threshold
+     ind_t, = np.where(t_stat > thresh)
+ 
+-    if len(ind_t) == 0:
+-        raise BCTParamError("Unsuitable threshold")
++    # F03: no suprathreshold edge is a valid outcome (no component); keep going
++    # so that the null distribution is still returned.
+ 
+     # suprathreshold adjacency matrix
+     adj = np.zeros((n, n))
+@@ -197,8 +200,7 @@
+     if np.size(sz_links):
+         max_sz = np.max(sz_links)
+     else:
+-        # max_sz=0
+-        raise BCTParamError('True matrix is degenerate')
++        max_sz = 0  # F03: no observed component
+     print('max component size is %i' % max_sz)
+ 
+     # estimate empirical null distribution of maximum component size by
+@@ -259,6 +261,7 @@
+     pvals = np.zeros((nr_components,))
+     # calculate p-vals
+     for i in range(nr_components):
+-        pvals[i] = np.size(np.where(null >= sz_links[i])) / k
++        # F02 (Phipson & Smyth 2010): (1 + b) / (k + 1)
++        pvals[i] = (1 + np.size(np.where(null >= sz_links[i]))) / (k + 1)
+ 
+     return pvals, adj, null
