@@ -1,7 +1,7 @@
 %% organize_signals.m
-% Location: <project>/code/organize_signals/organize_signals.m
-% Expected siblings: <project>/code, <project>/confound_correction_outputs,
-%                    <project>/signals
+% Location: /blue/febo/share/Abeta_Age/rabies/code/organize_signals/organize_signals.m
+% Expected siblings: /blue/febo/share/Abeta_Age/rabies/code, /blue/febo/share/Abeta_Age/rabies/confound_correction_outputs,
+%                    /blue/febo/share/Abeta_Age/rabies/signals
 %
 % On the cluster, load FSL before starting MATLAB.
 
