@@ -1,5 +1,5 @@
 ### Run order 
-•	Recommended order: individual code can be run independently
+•	Recommended order: individual code can be run independently. But see main README.md
 
 #	Step
 0	Test jobs (run_hmm_tests.sbatch, run_static_tests.sbatch)
