@@ -1,4 +1,4 @@
-<img width="3167" height="3240" alt="Fig_schematic_event_mechanism" src="https://github.com/user-attachments/assets/949a958f-2840-4e06-87ee-3faa85b4b36a" />
+
 ### Mouse functional connectivity: workflow code for mouse fmri multi-roi timeseries
 
 Analysis pipeline used in: https://www.biorxiv.org/content/10.64898/2026.04.26.720907v4 
@@ -132,3 +132,7 @@ Record these from the test logs:
 - HMM-MAR https://github.com/OHBA-analysis/HMM-MAR (see notes on declining support for used version);
 - BCT release MATLAB version 2017_01_15_BCT;
 - Python 3.12, SciPy (≥ 1.16), statsmodels, networkx, bctpy 0.6.1.
+
+
+### Example schematic of typical outputs
+<img width="3167" height="3240" alt="Fig_schematic_event_mechanism" src="https://github.com/user-attachments/assets/949a958f-2840-4e06-87ee-3faa85b4b36a" />
