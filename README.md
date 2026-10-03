@@ -1,3 +1,4 @@
+<img width="3167" height="3240" alt="Fig_schematic_event_mechanism" src="https://github.com/user-attachments/assets/949a958f-2840-4e06-87ee-3faa85b4b36a" />
 ### Mouse functional connectivity: workflow code for mouse fmri multi-roi timeseries
 
 Analysis pipeline used in: https://www.biorxiv.org/content/10.64898/2026.04.26.720907v4 
