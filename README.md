@@ -1,4 +1,4 @@
-### Abeta mouse functional connectivity: workflow code for mouse fmri multi-roi timeseries
+### Mouse functional connectivity: workflow code for mouse fmri multi-roi timeseries
 
 Analysis pipeline used in: https://www.biorxiv.org/content/10.64898/2026.04.26.720907v4 
 
