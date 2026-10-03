@@ -1,0 +1,6 @@
+/blue/febo/share/APOE_mice/bids_converted/sub-010/func/sub-010_task-rest_bold.nii.gz
+/blue/febo/share/APOE_mice/bids_converted/sub-015/func/sub-015_task-rest_bold.nii.gz
+/blue/febo/share/APOE_mice/bids_converted/sub-018/func/sub-018_task-rest_bold.nii.gz
+/blue/febo/share/APOE_mice/bids_converted/sub-021/func/sub-021_task-rest_bold.nii.gz
+/blue/febo/share/APOE_mice/bids_converted/sub-022/func/sub-022_task-rest_bold.nii.gz
+/blue/febo/share/APOE_mice/bids_converted/sub-058/func/sub-058_task-rest_bold.nii.gz
