@@ -23,6 +23,6 @@
 5.	Before running run_hmm_tests.sbatch, run_static_tests.sbatch, it is recommended hipergator_tests/setup_python_env and then link_to_signals before step 0 in table. 
 6.	All README files provide information on how to adjust to your data sets. 
 
-### ISCLAIMER: This code was put together for analysis of our datasets and is freely distributable as an analysis workflow that others can use and test on our data (see information on how to obtain data sets used in this study). It adapts code already available (see publications list and code repositories list). There are no guarantees that the code will work on other data and it is not for clinical use or diagnostics, only for research purposes. 
+### DISCLAIMER: This code was put together for analysis of our datasets and is freely distributable as an analysis workflow that others can use and test on our data (see information on how to obtain data sets used in this study). It adapts code already available (see publications list and code repositories list). There are no guarantees that the code will work on other data and it is not for clinical use or diagnostics, only for research purposes. 
 
 
