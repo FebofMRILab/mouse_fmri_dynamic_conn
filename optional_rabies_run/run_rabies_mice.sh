@@ -33,7 +33,8 @@ seeds_dir="${atlas_dir}/ROIs_Lo"
 static_fc="${project_dir}/rabies/static"
 dynamic_fc="${project_dir}/rabies/signals"
 
-mkdir -p ${static_fc} ${dynamic_fc}
+mkdir -p "$static_fc" \
+         "$dynamic_fc"
 
 # -------------------- Prerequisites --------------------
 for path in "$input_BIDS" "$atlas_dir" "$seeds_dir" \
