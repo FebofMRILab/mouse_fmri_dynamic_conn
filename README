@@ -1,4 +1,6 @@
-# Abeta mouse functional connectivity: code
+# Abeta mouse functional connectivity: workflow code for mouse fmri multi-roi timeseries
+
+Analysis pipeline used in: https://www.biorxiv.org/content/10.64898/2026.04.26.720907v4 
 
 This is the code for the static and dynamic FC analyses of the Abeta mouse cohort:
 - 95 mice in 7 groups;
@@ -13,10 +15,10 @@ Each package has its own `README.md` (how to run it) and `CHANGES.md` (every cha
 
 ## 1. Folder layout
 
-The code and the data sit in sibling folders on HiPerGator. Share only `code/`, plus the derived, de-identified matrices.
+The code and the data sit in sibling folders on HiPerGator (University of Florida Computing Environment - Analogs exist elsewhere at other institutions). Shared files are contained in `code/`, plus the derived, de-identified example and study matrices.
 
 ```
-/blue/febo/share/Abeta_Age/rabies/
+Example network location: /blue/febo/share/Abeta_Age/rabies/
 ├── code/                           ← this repository (abeta_fc_code.zip unpacks as code/)
 │   ├── README.md                   this file
 │   ├── hipergator_tests/           environment setup, test jobs, HMM pipeline job, link helper
@@ -125,7 +127,7 @@ Short steps (3, 4, 13–16) can run in an interactive session (`srun -A febo --q
 ## 5. Software versions to report
 
 Record these from the test logs:
-- MATLAB release;
-- HMM-MAR commit;
-- BCT release;
-- Python, SciPy (≥ 1.16), statsmodels, networkx, bctpy 0.6.1.
+- MATLAB release 2026a (works with 2024b);
+- HMM-MAR https://github.com/OHBA-analysis/HMM-MAR (see notes on declining support for used version);
+- BCT release MATLAB version 2017_01_15_BCT;
+- Python 3.12, SciPy (≥ 1.16), statsmodels, networkx, bctpy 0.6.1.
