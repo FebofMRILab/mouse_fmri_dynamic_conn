@@ -18,7 +18,7 @@ trap 'printf "ERROR at line %s: %s\n" "$LINENO" "$BASH_COMMAND" >&2' ERR
 data="${DATA_NAME:-Abeta_Age}"
 main_dir="/blue/febo/share"
 project_dir="${main_dir}/${data}"
-atlas_dir="${main_dir}/civm_atlas"
+atlas_dir="${main_dir}/civm_atlas" # this is which ever atlas is used in the RABIES workflow
 
 input_BIDS="${project_dir}/bids_converted"
 preprocess_outputs="${project_dir}/rabies/preprocess_outputs"
@@ -28,6 +28,12 @@ analysis_outputs="${project_dir}/rabies/analysis_outputs"
 rabies_container="${main_dir}/rabies_0.6.1.sif"
 rois="${atlas_dir}/BrainNetCoord.nii"
 seeds_dir="${atlas_dir}/ROIs_Lo"
+
+# -------------------- Post-directories Setup --------------------
+static_fc="${project_dir}/rabies/static"
+dynamic_fc="${project_dir}/rabies/signals"
+
+mkdir -p ${static_fc} ${dynamic_fc}
 
 # -------------------- Prerequisites --------------------
 for path in "$input_BIDS" "$atlas_dir" "$seeds_dir" \
