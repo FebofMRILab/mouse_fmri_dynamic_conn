@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=mouse_fmri
+#SBATCH --job-name=rabies_mus
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=febo@ufl.edu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem=128gb
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=32gb
 #SBATCH --time=124:00:00
 #SBATCH --account=febo
 #SBATCH --output=output_rabies_%j.log
