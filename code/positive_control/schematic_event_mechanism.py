@@ -57,7 +57,7 @@ TABLE_CAPTION = ("Positive control: 95 simulated mice per mechanism, each built 
 FOOTNOTE = [   # one entry per printed line
     "d: median z(observed) − z(own stationary replicas). B and C were set to the mice's DCC excess; "
     "A's 0.24 (p = 0.02) is the residual bias.",
-    "HMM: pre-registered test (HMM-PCA rank 15 and 25 × K = 2–4, 30 split-halves, calibrated against "
+    "HMM: pre-specified test (HMM-PCA rank 15 and 25 × K = 2–4, 30 split-halves, calibrated against "
     "replicas, Holm): cells meeting the rule",
     "(range of calibrated medians). Bold: not distinguishable from the mice (Mann–Whitney p > 0.05).",
     "The mice match none of the three; what sets them apart is FC change between scan halves.",

@@ -14,7 +14,7 @@ Per cohort (Mouse, A Gaussian, B events, C switching, C_strong):
                       dfc_confound_checks.py): the time-scale discriminator
   Bursts / FC change  burst_z and fc_change_z (as dfc_confound_checks.py) and
                       the kurtosis of the co-fluctuation magnitude (RSS)
-  PCA-HMM             the pre-registered decision from analyze_confirm_lowrank.py
+  PCA-HMM             the pre-specified decision from analyze_confirm_lowrank.py
                       (run automatically if its output is missing): cells with
                       state structure, best cell, calibrated median
   State recovery      C and C_strong only: how well the lowrank-15 full-fit
@@ -480,7 +480,7 @@ def figure(P, R, hmm, TR, cohorts, out_dir):
              "events, C state switching (B and C matched to the mouse DCC excess); C strong: the "
              "same mice as C, larger state separation.\nA-C: calibrated excess over stationary "
              "replicas. D: mice with DCC a z > 1.645. G: calibrated median (95% CI) per model "
-             "and K; filled = state structure by the pre-registered rule.\nH: bars = "
+             "and K; filled = state structure by the pre-specified rule.\nH: bars = "
              "best-matched correlation with the simulated states; black lines = chance "
              "(95th percentile).", fontsize=6.3, color=SECONDARY, linespacing=1.5)
     for ext in ("pdf", "png"):
