@@ -44,7 +44,7 @@ cd ..
 if [[ -d hmm_py ]]; then
     echo "== 3. HMM statistics and figure scripts (updated vs previous, simulated data)"
     (cd hmm_py && $PY tests/test_hmm_python_stats.py "$OUT/hmm_py_work") 2>&1 \
-        | tail -25 | tee "$OUT/test_hmm_python_stats_output.txt"
+        | tail -40 | tee "$OUT/test_hmm_python_stats_output.txt"
 fi
 if [[ -d dfc ]]; then
     echo "== 4. DFC plotting group statistics (updated vs previous)"

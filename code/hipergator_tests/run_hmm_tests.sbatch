@@ -3,7 +3,9 @@
 # run5B functions, (2) previous vs updated code on the existing mouse fit (no
 # refit), (3) whether the previous run4e outputs come from one fit or two,
 # (4) the updated run4e -> run4d -> run5 -> run5B chain on simulated data,
-# (5) the drift script (Python) on that simulated fit. One core; about 1-1.5 h.
+# (4b, 4c) the fit-selection rule on simulated fits and on eight real run4e fits
+# of the simulated cohort, (5) the drift script (Python) on that simulated fit.
+# One core; about 1.5 h.
 # Step 5 uses the Python environment from setup_python_env.sh.
 #
 # Submit from code/ (the folder that contains hmm_v2/):
@@ -22,12 +24,13 @@
 
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
+unset DISPLAY      # no X11 in batch jobs (silences "Invalid MIT-MAGIC-COOKIE-1 key")
 
 # ---- inputs: the existing (previous) mouse fit, K = 3 pre-PCA 15, no refit.
 # These tests compare previous and updated code on the same fit, so they use
 # the fit that already exists, not the reported model. Data folder as in hmm_config.m.
 SIGNALS=${HMM_OUT_BASE:-/blue/febo/share/Abeta_Age/rabies/signals}
-HMM_RESULTS=${HMM_RESULTS:-$SIGNALS/hmmmar_simple_k3_hmmpca15/raw_hmm_results.mat}
+HMM_RESULTS=${HMM_RESULTS:-$SIGNALS/hmmmar_simple_k3_pca15/raw_hmm_results.mat}
 HMM_SIGNALS=${HMM_SIGNALS:-$SIGNALS/hmm_signals}
 HMMMAR_DIR=${HMMMAR_DIR:-/blue/febo/MATLAB/HMM-MAR-master}
 if [[ -z "${BCT_DIR:-}" ]]; then        # find the folder holding BCT's threshold_proportional.m
@@ -75,6 +78,18 @@ echo "== 4. Updated run4e -> run4d -> run5 -> run5B on a simulated cohort"
 matlab -nodisplay -nosplash -singleCompThread -batch "cd('hmm_v2/tests'); \
     test_workflow_synthetic('$HMMMAR_DIR', '$BCT_DIR', '$OUT/workflow'); quit force" \
     || echo "Workflow test stopped with an error (see above)."
+
+echo "== 4b. Fit-selection rule (select_reported_fit.m) on simulated fits with a known answer"
+matlab -nodisplay -nosplash -singleCompThread -batch "cd('hmm_v2/tests'); \
+    r = test_select_reported_fit('$HMMMAR_DIR', '$OUT/select_fit'); \
+    writetable(struct2table(r), '$OUT/select_fit_tests.csv'); quit force" \
+    || echo "Fit-selection test stopped with an error (see above)."
+
+echo "== 4c. Fit selection on real run4e outputs (8 fits of the simulated cohort from step 4)"
+matlab -nodisplay -nosplash -singleCompThread -batch "cd('hmm_v2/tests'); \
+    r = test_select_on_run4e('$HMMMAR_DIR', '$OUT/workflow', '$OUT/select_on_run4e'); \
+    writetable(struct2table(r), '$OUT/select_on_run4e_tests.csv'); quit force" \
+    || echo "Selection on run4e outputs stopped with an error (see above)."
 
 echo "== 5. Drift test (Python): equivalence with the confirmatory code, then on the simulated fit"
 ENV=${ENV:-/blue/febo/$USER/envs/fc_static}

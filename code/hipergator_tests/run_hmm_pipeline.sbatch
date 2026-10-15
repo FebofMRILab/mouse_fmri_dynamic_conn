@@ -11,6 +11,8 @@
 #   mkdir -p logs && sbatch hipergator_tests/run_hmm_pipeline.sbatch
 # Any hmm_config.m setting can be overridden at submission, e.g.
 #   sbatch --export=ALL,HMM_LOWRANK=25 hipergator_tests/run_hmm_pipeline.sbatch
+# SKIP_FIT=1 skips run4e and runs every later step on an existing fit; for the
+# fit chosen by select_reported_fit.m, submit with hipergator_tests/run_selected_fit.sh.
 #SBATCH --job-name=hmm_pipeline
 #SBATCH --account=febo
 #SBATCH --qos=febo
@@ -23,6 +25,7 @@
 
 set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
+unset DISPLAY      # no X11 in batch jobs (silences "Invalid MIT-MAGIC-COOKIE-1 key")
 if [[ -z "${HMM_BCT:-}" ]]; then        # BCT folder (threshold_proportional.m), for run5 and run5B
     f=$(find /blue/febo/MATLAB -name threshold_proportional.m -print -quit 2>/dev/null)
     export HMM_BCT=${f:+$(dirname "$f")}
@@ -30,12 +33,17 @@ fi
 ENV=${ENV:-/blue/febo/$USER/envs/fc_static}
 M="matlab -nodisplay -nosplash -singleCompThread -batch"
 SIGNALS=${HMM_OUT_BASE:-/blue/febo/share/Abeta_Age/rabies/signals}
-[[ -d "$SIGNALS/hmm_signals" ]] || { echo "No hmm_signals/ in $SIGNALS (set HMM_OUT_BASE)"; exit 1; }
-echo "Start $(date); data: $SIGNALS; K = ${HMM_K:-4 (default)}; BCT: ${HMM_BCT:-not found}"
+DATA=${HMM_DATA_DIR:-$SIGNALS/hmm_signals}
+[[ -d "$DATA" ]] || { echo "No signal folder $DATA (set HMM_OUT_BASE or HMM_DATA_DIR)"; exit 1; }
+echo "Start $(date); outputs: $SIGNALS; signals: $DATA; K = ${HMM_K:-4 (default)}; BCT: ${HMM_BCT:-not found}"
 
 module purge
 module load matlab
-$M "addpath('hmm_v2'); run4e_hmm_mar; quit force" || { echo "run4e failed; stop."; exit 1; }
+if [[ "${SKIP_FIT:-0}" == 1 ]]; then
+    echo "SKIP_FIT=1: using the existing fit in ${HMM_MODEL_DIR:-$SIGNALS (hmm_config.m model folder)}"
+else
+    $M "addpath('hmm_v2'); run4e_hmm_mar; quit force" || { echo "run4e failed; stop."; exit 1; }
+fi
 $M "addpath('hmm_v2'); addpath('hmm_v2/tests'); check_against_confirmatory(); quit force" \
     || echo "Comparison with the confirmatory fit not run (file missing?); continuing."
 
