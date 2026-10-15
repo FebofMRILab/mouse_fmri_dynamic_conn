@@ -8,12 +8,12 @@
 %   raw_hmm_state_fc.mat  group state FC (state_fc) and the model's own
 %                         estimate (state_fc_model)
 %   occupancy_by_quarter.csv  per mouse x state x scan quarter (for the
-%                         pre-registered drift test: hmm_occupancy_drift.py)
+%                         pre-specified drift test: hmm_occupancy_drift.py)
 %   fit_id.txt, hmm_config_used.mat, metadata_aligned.csv, state_##_raw_HMM_FC.png
 % Every file carries the fit ID (hmm_fit_id.m); later steps check it.
 %
 % The fit uses the options and number of initialisations of the
-% pre-registered confirmatory full fits (run4c_confirm_lowrank.m), including
+% pre-specified confirmatory full fits (run4c_confirm_lowrank.m), including
 % options.useParallel = 0. HMM-MAR reseeds from the clock at each
 % initialisation (initGamma_random.m), so every run gives a new fit with a new
 % fit ID; tests/check_against_confirmatory.m compares it with the confirmatory
@@ -193,7 +193,7 @@ fprintf(fid, '%s\n', R.fit_id);
 fclose(fid);
 save(fullfile(out_dir, 'hmm_config_used.mat'), 'cfg');
 
-%% ========== Occupancy by scan quarter (pre-registered drift test) ==========
+%% ========== Occupancy by scan quarter (pre-specified drift test) ==========
 % Same definition as run4c_confirm_lowrank.m: per mouse, the mean of each
 % state's probability in each quarter of the scan. Tested by
 % hmm_occupancy_drift.py with the same code as the confirmatory analysis.

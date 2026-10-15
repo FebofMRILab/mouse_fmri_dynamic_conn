@@ -2,7 +2,7 @@
 """
 hmm_occupancy_drift.py
 -------------------------------------------------------------------
-Pre-registered drift test for the REPORTED HMM fit (the one run4e saved).
+Pre-specified drift test for the REPORTED HMM fit (the one run4e saved).
 
 Same test as the confirmatory analysis (analyze_confirm_lowrank.py, drift
 section): for each state, each mouse's change in fractional occupancy between

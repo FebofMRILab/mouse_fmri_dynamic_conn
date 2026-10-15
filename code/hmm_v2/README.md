@@ -4,7 +4,7 @@
 
 Every step reads its settings from `hmm_config.m` and works on one fit, identified by its fit ID.
 
-**Reported model:** HMM-PCA (`options.lowrank = 15`), K = 4. The rank was fixed before the pre-registered confirmatory test (rank 15/25 × K = 2–4); at rank 15, K = 4 is the only K that met its decision rule (calibrated median 0.051, Holm p = 0.0009; `hmm_confirm_lowrank/analysis/confirm_cells.csv`). K = 3, reported before, did not (0.007, Holm p = 0.12). Details in `CHANGES.md`, "Reported model". It is fitted with that test's options and saved in `/blue/febo/share/Abeta_Age/rabies/signals/hmmmar_simple_k4_hmmpca15/`.
+**Reported model:** HMM-PCA (`options.lowrank = 15`), K = 4, chosen after the pre-specified confirmatory test (rank 15/25 × K = 2–4): at rank 15, the rank the spin-echo hypothesis favoured, K = 4 is the only K that met its decision rule (calibrated median 0.051, Holm p = 0.0009; `hmm_confirm_lowrank/analysis/confirm_cells.csv`). K = 3, reported before, did not (0.007, Holm p = 0.12). Details in `CHANGES.md`, "Reported model". It is fitted with that test's options and saved in `/blue/febo/share/Abeta_Age/rabies/signals/hmmmar_simple_k4_hmmpca15/`.
 
 **Data folder:** `/blue/febo/share/Abeta_Age/rabies/signals` (`HMM_OUT_BASE`), with the signal files in its `hmm_signals/`. Every step reads and writes there, wherever it is started from.
 

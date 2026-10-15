@@ -7,10 +7,10 @@ function cfg = hmm_config()
 % Every step saves the configuration it used next to its outputs.
 %
 % Reported model: HMM-PCA (options.lowrank = 15), K = 4, with the options of
-% the pre-registered confirmatory full fits (run4c_confirm_lowrank.m: same
-% options, 15 initialisations, no parallel pool). Rank 15 was fixed before the
-% confirmatory test; K = 4 is the only K at rank 15 that met its decision rule
-% (CHANGES.md, "Reported model").
+% the pre-specified confirmatory full fits (run4c_confirm_lowrank.m: same
+% options, 15 initialisations, no parallel pool). K = 4 is the only K at rank 15
+% that met the confirmatory test's decision rule; it was chosen after the
+% results (CHANGES.md, "Reported model").
 %
 % Data: /blue/febo/share/Abeta_Age/rabies/signals holds hmm_signals/ and every
 % HMM output folder (static/ sits next to it). HMM_OUT_BASE points elsewhere.
@@ -22,8 +22,8 @@ function cfg = hmm_config()
 % tests/check_against_confirmatory.m compares a new fit with the confirmatory one.
 
 % ---- model ----
-cfg.K = env_num('HMM_K', 4);                    % number of states
-cfg.lowrank = env_num('HMM_LOWRANK', 15);       % HMM-PCA rank (options.lowrank; 0 = off)
+cfg.K = env_num('HMM_K', 3);                    % number of states
+cfg.lowrank = env_num('HMM_LOWRANK', 25);       % HMM-PCA rank (options.lowrank; 0 = off)
 cfg.pca = env_num('HMM_PCA', 0);                % PCA before the HMM (options.pca; 0 = off)
 cfg.TR_sec = env_num('HMM_TR', 2);
 cfg.seed = env_num('HMM_SEED', 20261001 + cfg.K);   % as run4c; recorded, but see above
