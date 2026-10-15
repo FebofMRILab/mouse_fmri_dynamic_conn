@@ -22,8 +22,8 @@ from pathlib import Path
 
 import pandas as pd
 
-K = int(os.environ.get("HMM_K", "4"))
-LOWRANK = int(os.environ.get("HMM_LOWRANK", "15"))
+K = int(os.environ.get("HMM_K", "3"))
+LOWRANK = int(os.environ.get("HMM_LOWRANK", "25"))
 PCA = int(os.environ.get("HMM_PCA", "0"))
 if LOWRANK > 0 and PCA > 0:
     raise SystemExit("Set either HMM_LOWRANK (HMM-PCA) or HMM_PCA, not both.")
