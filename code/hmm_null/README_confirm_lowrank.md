@@ -17,7 +17,7 @@ The spin-echo argument does give an a priori reason to test low rank. At
 signal should sit in a small subspace buried in thermal noise. This is a new
 test with fresh randomness and a decision rule fixed in advance.
 
-## Pre-registered design
+## Pre-specified design
 
 | | |
 |---|---|

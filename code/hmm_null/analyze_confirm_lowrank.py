@@ -2,7 +2,7 @@
 """
 analyze_confirm_lowrank.py
 -------------------------------------------------------------------
-Pre-registered analysis of the confirmatory PCA-HMM run
+Pre-specified analysis of the confirmatory PCA-HMM run
 (run4c_confirm_lowrank.m). Reads <root>/observed and <root>/replica.
 
 Per model (lowrank 15, 25) x K (2, 3, 4), with demeaned state-FC split-half
@@ -133,7 +133,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="hmm_confirm_lowrank")
     ap.add_argument("--null", default="phase", choices=["phase", "iaaft"],
-                    help="phase = the pre-registered decision null")
+                    help="phase = the pre-specified decision null")
     ap.add_argument("--out_dir", default=None)
     args = ap.parse_args()
     sfx = "" if args.null == "phase" else "_iaaft"
@@ -264,7 +264,7 @@ def main():
                        fontsize=7)
     ax.set_xlabel("Calibrated difference\n(median, 95% CI)", fontsize=8)
     ax.tick_params(axis="x", labelsize=7)
-    ax.set_title("Pre-registered test (Holm p)", fontsize=8, loc="left")
+    ax.set_title("Pre-specified test (Holm p)", fontsize=8, loc="left")
     sns.despine(ax=ax)
     ax.text(-0.9, 1.14, next(letters), transform=ax.transAxes, fontsize=11, fontweight="bold")
 
@@ -311,12 +311,12 @@ def main():
     cols = ["model", "K", "n_paired", "delta_uncal", "p_uncal", "delta_replica",
             "calibrated_median", "ci_low", "ci_high", "p_calibrated", "p_calibrated_holm",
             "weakest_obs", "weakest_null", "state_structure"]
-    print(f"\nPre-registered cells ({args.null} null):")
+    print(f"\nPre-specified cells ({args.null} null):")
     print(T[[c for c in cols if c in T]].round(4).to_string(index=False))
     hits = T[T.state_structure]
     print("\nDECISION: " + ("state structure supported for " +
                             ", ".join(f"{m} K={k}" for m, k in zip(hits.model, hits.K))
-                            if len(hits) else "no cell meets the pre-registered criterion"))
+                            if len(hits) else "no cell meets the pre-specified criterion"))
     if not D.empty:
         print("\nOccupancy drift (Holm within K):")
         print(D.round(4).to_string(index=False))

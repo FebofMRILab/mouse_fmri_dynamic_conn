@@ -1,4 +1,4 @@
-# HMM split-half null and pre-registered confirmatory test
+# HMM split-half null and pre-specified confirmatory test
 
 | Part | Files | Details |
 |---|---|---|

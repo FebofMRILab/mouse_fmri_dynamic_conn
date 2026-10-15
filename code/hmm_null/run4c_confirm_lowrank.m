@@ -3,7 +3,7 @@
 % (HMM-MAR options.lowrank), motivated by the spin-echo / low-signal-rank
 % argument. Written BEFORE any of these fits were run.
 %
-% PRE-REGISTERED DESIGN (do not edit after seeing results)
+% PRE-SPECIFIED DESIGN (do not edit after seeing results)
 %   Models      lowrank 15 and lowrank 25 (HMM_CONFIG = 1 or 2)
 %   K           2, 3, 4
 %   Randomness  fresh: seed 20261001 for splits and surrogates (the
@@ -57,7 +57,7 @@ TR_sec = local_env_num('HMM_TR', 2);
 toolbox_dir = local_env_str('HMM_TOOLBOX', '/blue/febo/MATLAB/HMM-MAR-master');
 out_root = local_env_str('HMM_OUT_DIR', 'hmm_confirm_lowrank');
 
-% ---- pre-registered settings ----
+% ---- pre-specified settings ----
 lowrank_dims = [15, 25];
 K_values = 2:4;
 n_split_half = 30;

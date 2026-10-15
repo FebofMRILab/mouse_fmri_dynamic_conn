@@ -46,16 +46,16 @@ close all;
 %% ========== Configuration ==========
 data_dir = 'hmm_signals';
 file_pattern = 'signal%d.txt';
-n_subjects = 58;
-TR_sec = 3;
+n_subjects = 95;
+TR_sec = 2;
 
 toolbox_dir = '/blue/febo/MATLAB/HMM-MAR-master';
 out_dir = 'hmm_raw_timeseries_null';
 
 % Primary model (set to the null-supported choice from the sensitivity run)
-model_type = 'gaussian';     % 'lowrank' (HMM-PCA) or 'gaussian'
-lowrank_dim = 50;            % used when model_type = 'lowrank'
-pca_dim_primary = 25;        % used when model_type = 'gaussian' (0 = no PCA)
+model_type = 'lowrank';     % 'lowrank' (HMM-PCA) or 'gaussian'
+lowrank_dim = 10;            % used when model_type = 'lowrank'
+pca_dim_primary = 0;        % used when model_type = 'gaussian' (0 = no PCA)
 
 % 1 = covariance (FC) states only (primary analysis).
 % 0 = states also have a mean: activation / co-activation states. Diagnostic
