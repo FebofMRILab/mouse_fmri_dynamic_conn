@@ -135,6 +135,14 @@ measures; observed values for the static ones), with the study's Welch tests
 (`welch_tests_scipy.py`: Welch ANOVA with permutation p; ordinary Welch t for
 the 8 planned contrasts). See `CHANGES_welch.md`.
 
+## Supplement figures in natural units (14 Oct 2026)
+
+The main figures show each measure as z against the mouse's own phase surrogates. Two Supplement figures show the same results in the measures' own units:
+
+- `plot_dfc_raw_units.py` → `figures/FigS_dfc_raw_units` and `figures/table_raw_units.csv`: for each pre-specified measure, every mouse's observed value against the mean of its 19 phase surrogates (DCC a, SD of the conditional correlation, GARCH α, …), from `dfc_subject_metrics.csv`. Descriptive; the replicas' raw values are not stored, so the calibration is shown only as z.
+- `dcc_example_traces.m` + `plot_dcc_example.py` → `dcc_example/FigS_dcc_example`: ρ(t), between −1 and 1 as in Lindquist et al. (2014), for one NTG_Y mouse drawn at random (`rng(20261014)`), computed with the published estimator (`dcc_mvgarch.m`) on the pipeline's input for that mouse and on its 19 phase surrogates (the pipeline's own seeds). Components 1–2, 1–3 and 2–3 were fixed in advance; panel D shows the SD of ρ(t) for all 300 pairs. Display only.
+- Both run in `hipergator_tests/run_dcc_example.sbatch`. Test: `tests/test_dcc_example_traces.m` (X1–X6, Octave, with a stand-in for `dcc_mvgarch.m`): the mouse is NTG_Y and reproducible; the group PCA and the surrogates equal the pipeline's own (`local_group_pca`, `local_surrogate`, extracted unchanged; differences 4.7e-16 and 0).
+
 ## Run on HiPerGator
 
 Put every file in the folder that contains `hmm_signals/`. Set `n_subjects`,

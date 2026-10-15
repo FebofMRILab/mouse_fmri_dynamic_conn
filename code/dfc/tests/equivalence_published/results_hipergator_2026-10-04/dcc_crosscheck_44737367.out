@@ -1,0 +1,20 @@
+Invalid MIT-MAGIC-COOKIE-1 key
+Invalid MIT-MAGIC-COOKIE-1 key
+
+EXITFLAG =
+
+     0
+
+DCC cross-check: dfc_dcc_subject.m vs dcc_mvgarch.m (Lindquist DCC toolbox)
+{Error using cellfun
+Unexpected output was returned while using Uniform output, at index 2. Set
+'UniformOutput' to false.
+
+Error in compare_dcc_with_lindquist>@(varargin)cellfun(@(f)fprintf(f,varargin{:}),{1,fid}) (line 78)
+say = @(varargin) cellfun(@(f) fprintf(f, varargin{:}), {1, fid});
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error in compare_dcc_with_lindquist (line 79)
+say('DCC cross-check: dfc_dcc_subject.m vs dcc_mvgarch.m (Lindquist DCC toolbox)\n');
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+} 
+Cross-check failed (see above).

@@ -51,8 +51,8 @@ cfg.file_pattern = 'signal%d.txt';
 cfg.n_subjects = 95;
 cfg.TR = 2;                      % seconds (mouse); 3 for the human data
 cfg.expected_T = 570;            % volumes per subject (warning only); [] = skip
-cfg.out_dir = 'dfc_dcc_cpca';
-cfg.pca_dim = 25;                % DCC space = the HMM primary representation
+cfg.out_dir = 'dfc_dcc_cpca_pca15';
+cfg.pca_dim = 15;                % DCC space = the HMM primary representation
 cfg.ar_order = 2;                % AR prewhitening before GARCH/DCC
 cfg.cpca_spaces = {'roi', 'pca'};% complex PCA: ROI space (primary) + PCA check
 cfg.n_comp_cpca = 3;
