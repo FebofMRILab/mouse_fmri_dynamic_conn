@@ -19,8 +19,8 @@ clc; clear;
 addpath('/blue/febo/MATLAB/BCT');   % no savepath: do not modify the shared path
 
 %% ---------- Configuration ----------
-data_dir     = '../../../signals/hmm_signals';
-out_dir      = '../../../static';
+data_dir     = '../../signals/hmm_signals';
+out_dir      = '../../static';
 mapping_csv  = fullfile(out_dir, 'subject_group_order_mappings.csv');  % optional check
 expected_timepoints = 570;          % 600 volumes minus 15 at each end; [] to skip
 
