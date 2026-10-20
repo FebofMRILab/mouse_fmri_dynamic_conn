@@ -211,7 +211,7 @@ def main():
     ax.legend(handles=[Line2D([], [], color=SECONDARY, lw=1.3, label="median (band: 5-95 %)"),
                        Line2D([], [], color=SECONDARY, lw=0.9, ls=":", label="unrelated subspaces (k/N)")],
               frameon=False, fontsize=6, loc="lower right")
-    for ax, letter in zip(axes, "AB"):
+    for ax, letter in zip(axes, "DE"):
         for k in MARK_K:
             ax.axvline(k, color=BASELINE, lw=0.8, zorder=0)
         ax.tick_params(labelsize=7)
