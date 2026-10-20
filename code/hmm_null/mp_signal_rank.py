@@ -139,28 +139,36 @@ def main():
             lams.append(lam)
             thrs.append(thr)
         if lams:
-            spectra[label] = (np.median(lams, axis=0), np.median(thrs, axis=0),
-                              float(np.median([r["mp_edge"] for r in rows if r["dataset"] == label])))
+            L = np.array(lams)
+            spectra[label] = (np.median(L, axis=0), np.median(thrs, axis=0),
+                              float(np.median([r["mp_edge"] for r in rows if r["dataset"] == label])),
+                              np.percentile(L, 25, axis=0), np.percentile(L, 75, axis=0))
         print(f"{label}: {len(lams)} subjects loaded from {ddir}")
     R = pd.DataFrame(rows)
     if R.empty:
         raise SystemExit("No subjects loaded.")
     R.to_csv(os.path.join(args.out_dir, "signal_rank_per_subject.csv"), index=False)
+    # i-th largest eigenvalue across subjects (median and IQR), as plotted in panel A
+    pd.DataFrame([dict(dataset=lab, rank=i + 1, eig_median=sp[0][i], eig_q25=sp[3][i],
+                       eig_q75=sp[4][i], pa_threshold_median=sp[1][i], mp_edge_median=sp[2])
+                  for lab, sp in spectra.items() for i in range(sp[0].size)]).to_csv(
+        os.path.join(args.out_dir, "signal_rank_spectrum_quantiles.csv"), index=False)
 
     # ---------------- figure ----------------
     labels = list(spectra)
     fig, axes = plt.subplots(1, 3, figsize=(8.0, 2.9), gridspec_kw=dict(wspace=0.5))
     ax = axes[0]
     for i, lab in enumerate(labels):
-        lam, thr, edge = spectra[lab]
+        lam, thr, edge, q1, q3 = spectra[lab]
         col = DATASET_COLORS[i % 3]
         k = np.arange(1, lam.size + 1)
+        ax.fill_between(k, q1, q3, color=col, alpha=0.18, lw=0)
         ax.plot(k, lam, "-", color=col, lw=1.3, label=f"{lab} (median)")
         ax.plot(k, thr, "--", color=col, lw=0.9)
         ax.axhline(edge, color=col, lw=0.7, ls=":")
     ax.set_yscale("log")
     ax.set_xlim(0, 40)
-    lo = min(float(np.min(spectra[lab][0][:40])) for lab in labels)
+    lo = min(float(np.min(spectra[lab][3][:40])) for lab in labels)
     ax.set_ylim(lo * 0.7, None)
     ax.set_xlabel("Eigenvalue rank", fontsize=8.5)
     ax.set_ylabel("Eigenvalue (correlation matrix)", fontsize=8.5)
@@ -168,7 +176,9 @@ def main():
     from matplotlib.lines import Line2D
     handles = [Line2D([], [], color=DATASET_COLORS[i % 3], lw=1.3, label=lab)
                for i, lab in enumerate(labels)]
-    handles += [Line2D([], [], color=SECONDARY, lw=0.9, ls="--", label="Parallel analysis, 95th pct"),
+    from matplotlib.patches import Patch
+    handles += [Patch(facecolor=SECONDARY, alpha=0.18, lw=0, label="IQR across subjects"),
+                Line2D([], [], color=SECONDARY, lw=0.9, ls="--", label="Parallel analysis, 95th pct"),
                 Line2D([], [], color=SECONDARY, lw=0.7, ls=":", label="Marchenko–Pastur edge")]
     ax.legend(handles=handles, frameon=False, fontsize=6, loc="lower left")
     ax.set_title("Median eigenvalue spectrum", fontsize=8, loc="left")
