@@ -48,7 +48,8 @@ from matplotlib.lines import Line2D                                    # noqa: E
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mp_signal_rank import (standardise, effective_samples, circular_shift,  # noqa: E402
-                            eigvals_corr, INK, SECONDARY, BASELINE, DATASET_COLORS)
+                            eigvals_corr, spectrum_axis, INK, SECONDARY, BASELINE,
+                            DATASET_COLORS)
 import seaborn as sns                                                  # noqa: E402
 
 SEED = 20261015
@@ -131,6 +132,8 @@ def main():
     ap.add_argument("--n_split", type=int, default=50)
     ap.add_argument("--k_max", type=int, default=40)
     ap.add_argument("--out_dir", default="signal_rank_group")
+    ap.add_argument("--spectrum_scale", choices=["log", "linear"], default="log",
+                    help="y-axis of the pooled-spectrum panel (log: plain-number ticks)")
     args = ap.parse_args()
     os.makedirs(args.out_dir, exist_ok=True)
     rng = np.random.default_rng(SEED)
@@ -193,9 +196,7 @@ def main():
         handles.append(Line2D([], [], color=c, lw=1.3,
                               label=f"{lab}: MP {r['rank_mp']}, PA {r['rank_pa']}"))
     ax = axes[0]
-    ax.set_yscale("log")
-    ax.yaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
-    ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    spectrum_axis(ax, args.spectrum_scale)
     ax.set_xlabel("Eigenvalue rank", fontsize=8.5)
     ax.set_ylabel("Eigenvalue, pooled correlation", fontsize=8.5)
     ax.set_title("Pooled spectrum and noise thresholds", fontsize=8, loc="left")
@@ -210,7 +211,7 @@ def main():
     ax.legend(handles=[Line2D([], [], color=SECONDARY, lw=1.3, label="median (band: 5-95 %)"),
                        Line2D([], [], color=SECONDARY, lw=0.9, ls=":", label="unrelated subspaces (k/N)")],
               frameon=False, fontsize=6, loc="lower right")
-    for ax, letter in zip(axes, "DE"):
+    for ax, letter in zip(axes, "AB"):
         for k in MARK_K:
             ax.axvline(k, color=BASELINE, lw=0.8, zorder=0)
         ax.tick_params(labelsize=7)

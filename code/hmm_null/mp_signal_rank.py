@@ -44,6 +44,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 import seaborn as sns
 
 plt.rcParams.update({"font.family": "Arial", "font.size": 12, "axes.titlesize": 13,
@@ -111,6 +112,23 @@ def subject_rank(X, rng, n_shift):
                 lambda1_share=float(lam[0] / lam.sum())), lam, thr
 
 
+def spectrum_axis(ax, scale="log", ymin=None):
+    """Y-axis of the eigenvalue-spectrum panel. 'log': log scale labelled with
+    plain numbers (0.2, 0.5, 1, 2, 5, 10) instead of powers of ten.
+    'linear': ordinary axis from 0."""
+    if scale == "linear":
+        ax.set_ylim(0, None)
+        return
+    ax.set_yscale("log")
+    if ymin is not None:
+        ax.set_ylim(ymin, None)
+    lo, hi = ax.get_ylim()
+    ticks = [v for v in (0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50) if lo <= v <= hi]
+    ax.yaxis.set_major_locator(matplotlib.ticker.FixedLocator(ticks))
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:g}"))
+    ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dataset", nargs=4, action="append", required=True,
@@ -118,6 +136,8 @@ def main():
     ap.add_argument("--file_pattern", default="signal{}.txt")
     ap.add_argument("--n_shift", type=int, default=50)
     ap.add_argument("--out_dir", default="signal_rank")
+    ap.add_argument("--spectrum_scale", choices=["log", "linear"], default="log",
+                    help="y-axis of the eigenvalue-spectrum panel (log: plain-number ticks)")
     args = ap.parse_args()
     os.makedirs(args.out_dir, exist_ok=True)
     rng = np.random.default_rng(SEED)
@@ -166,10 +186,9 @@ def main():
         ax.plot(k, lam, "-", color=col, lw=1.3, label=f"{lab} (median)")
         ax.plot(k, thr, "--", color=col, lw=0.9)
         ax.axhline(edge, color=col, lw=0.7, ls=":")
-    ax.set_yscale("log")
     ax.set_xlim(0, 40)
     lo = min(float(np.min(spectra[lab][3][:40])) for lab in labels)
-    ax.set_ylim(lo * 0.7, None)
+    spectrum_axis(ax, args.spectrum_scale, lo * 0.7)
     ax.set_xlabel("Eigenvalue rank", fontsize=8.5)
     ax.set_ylabel("Eigenvalue (correlation matrix)", fontsize=8.5)
     ax.tick_params(labelsize=7)
@@ -180,7 +199,8 @@ def main():
     handles += [Patch(facecolor=SECONDARY, alpha=0.18, lw=0, label="IQR across subjects"),
                 Line2D([], [], color=SECONDARY, lw=0.9, ls="--", label="Parallel analysis, 95th pct"),
                 Line2D([], [], color=SECONDARY, lw=0.7, ls=":", label="Marchenko–Pastur edge")]
-    ax.legend(handles=handles, frameon=False, fontsize=6, loc="lower left")
+    ax.legend(handles=handles, frameon=False, fontsize=6,
+              loc="lower left" if args.spectrum_scale == "log" else "upper right")
     ax.set_title("Median eigenvalue spectrum", fontsize=8, loc="left")
     sns.despine(ax=ax)
 
