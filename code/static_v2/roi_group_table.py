@@ -29,6 +29,8 @@ Outputs (in --out_dir, prefix --prefix, default "Strength")
 
 Usage
     python roi_group_table.py [input.csv] [--prefix Strength] [--out_dir .]
+    Other studies: --groups G1,G2,... --contrasts G1:G2,G3:G4 (defaults: the 7 Abeta_Age
+    groups and their 8 planned contrasts). The tests are unchanged.
 """
 
 import argparse
@@ -252,7 +254,19 @@ def main():
     ap.add_argument("--prefix", default="Strength")
     ap.add_argument("--out_dir", default=".")
     ap.add_argument("--n_perm", type=int, default=N_PERMUTATIONS)
+    ap.add_argument("--groups", help="comma-separated group order (default: the Abeta_Age groups)")
+    ap.add_argument("--contrasts", help="comma-separated A:B pairs (default: the 8 Abeta_Age contrasts)")
     args = ap.parse_args()
+    global GROUP_ORDER, PAIRWISE_COMPARISONS
+    if args.groups:
+        GROUP_ORDER = [g.strip() for g in args.groups.split(",")]
+    if args.contrasts:
+        PAIRWISE_COMPARISONS = [tuple(c.strip().split(":")) for c in args.contrasts.split(",")]
+    bad = sorted({g for c in PAIRWISE_COMPARISONS for g in c} - set(GROUP_ORDER))
+    if bad:
+        raise SystemExit(f"Contrast groups not in --groups: {', '.join(bad)}")
+    n_con = ("the 8 used throughout the study" if not args.contrasts
+             else f"{len(PAIRWISE_COMPARISONS)} pre-specified")
     os.makedirs(args.out_dir, exist_ok=True)
     out = lambda name: os.path.join(args.out_dir, f"{args.prefix}_{name}")  # noqa: E731
 
@@ -277,7 +291,7 @@ def main():
     ctab = contrast_table(cons)
     ctab.to_csv(out("planned_contrasts_table.csv"), index=False)
     cons.to_csv(out("planned_contrasts_numeric.csv"), index=False)
-    note_c = ("Planned contrasts (the 8 used throughout the study): ordinary two-sided "
+    note_c = (f"Planned contrasts ({n_con}): ordinary two-sided "
               "Welch t tests (Welch-Satterthwaite df); p-values adjusted with the "
               "Benjamini-Hochberg procedure pooled across contrasts and ROIs. " + stars)
     write_docx(ctab, out("planned_contrasts_table.docx"), "ROI Planned Contrasts",

@@ -73,6 +73,23 @@ NBS_ALPHA = 0.05
 NBS_TREND_ALPHA = 0.07
 RANDOM_SEED = 20260911
 
+# Other studies: STATIC_FC_CONFIG=<file.json> replaces the design above (2026-11-08). Keys (all optional):
+# "groups" [..], "colors" {group: hex}, "comparisons" [[a, b], ..], "expected_counts" {group: n}.
+# Without it the script runs exactly as published for the Abeta_Age cohort.
+_cfg_path = os.environ.get("STATIC_FC_CONFIG")
+_cfg = {}
+if _cfg_path:
+    import json
+    with open(_cfg_path) as _fh:
+        _cfg = json.load(_fh)
+    GROUP_ORDER = list(_cfg.get("groups", GROUP_ORDER))
+    GROUP_COLORS = dict(_cfg.get("colors", GROUP_COLORS))
+    PAIRWISE_COMPARISONS = [tuple(c) for c in _cfg.get("comparisons", PAIRWISE_COMPARISONS)]
+    _missing = sorted({g for c in PAIRWISE_COMPARISONS for g in c} - set(GROUP_ORDER)) + sorted(set(GROUP_ORDER) - set(GROUP_COLORS))
+    if _missing:
+        raise ValueError(f"STATIC_FC_CONFIG: groups missing from groups/colors: {_missing}")
+    print(f"Design from {_cfg_path}: {GROUP_ORDER}; {len(PAIRWISE_COMPARISONS)} comparisons")
+
 plt.rcParams.update({
     "font.family": "Arial",
     "font.size": 12,
@@ -153,6 +170,7 @@ print("\nGroup sizes:")
 print(meta["genotype"].value_counts(sort=False))
 
 expected_counts = {"NTG_Y": 19, "NTG_M": 9, "NTG_A": 24, "CRND8_Y": 13, "CRND8_M": 5, "5XFAD_Y": 12,"5XFAD_M": 12}
+expected_counts = dict(_cfg.get("expected_counts", expected_counts)) if _cfg else expected_counts
 observed_counts = meta["genotype"].value_counts().to_dict()
 
 for group, expected_n in expected_counts.items():

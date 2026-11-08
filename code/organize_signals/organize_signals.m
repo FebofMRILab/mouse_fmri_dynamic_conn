@@ -113,6 +113,22 @@ end
 subjectDirs = subjectDirs(order);
 imageFiles = imageFiles(order);
 
+%% Keep only the subjects listed in meta_data.csv (2026-11-08)
+% RABIES may have processed mice the study excludes. Extracting them would leave signal files in
+% hmm_signals that the matrix builder could stack; meta_data.csv defines the study's subjects.
+inMeta = ismember(subjectIds, meta.subject_id);
+if any(~inMeta)
+    fprintf('Skipping %d RABIES subject(s) not in meta_data.csv: %s\n', nnz(~inMeta), ...
+        strjoin(string(subjectIds(~inMeta))', ', '));
+end
+subjectIds = subjectIds(inMeta);
+subjectDirs = subjectDirs(inMeta);
+imageFiles = imageFiles(inMeta);
+nSubjects = numel(subjectIds);
+if nSubjects == 0
+    error('No RABIES subject matches a subject_id in meta_data.csv.');
+end
+
 %% Create each atlas ROI mask once, not once per subject
 setenv('FSLOUTPUTTYPE', 'NIFTI_GZ');
 maskDir = tempname;

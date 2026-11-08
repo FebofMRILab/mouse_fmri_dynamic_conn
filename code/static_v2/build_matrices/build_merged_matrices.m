@@ -23,8 +23,31 @@ data_dir     = '../../../signals/hmm_signals';
 out_dir      = '../../../static';
 mapping_csv  = fullfile(out_dir, 'subject_group_order_mappings.csv');  % optional check
 expected_timepoints = 570;          % 600 volumes minus 15 at each end; [] to skip
+if ~isempty(getenv('EXPECTED_TIMEPOINTS'))   % other studies, e.g. 560 = 600 - 2 x 20 at TR 1.5 s
+    expected_timepoints = str2double(getenv('EXPECTED_TIMEPOINTS'));
+end
 
-%% ---------- Find signal files in natural numeric order ----------
+%% ---------- Subjects and their order ----------
+% With signals/hmm_signals/meta_data.csv (written for organize_signals.m) the blocks follow its rows:
+% signal<subject_id>.txt for each row, in row order, and only those (2026-11-08). For a metadata file
+% listing 1..N in order this is the same as the natural numeric order used before. Without it, the
+% previous behaviour: every signal*.txt in natural numeric order.
+meta_csv = fullfile(data_dir, 'meta_data.csv');
+meta_groups = strings(0, 1);
+if isfile(meta_csv)
+    meta = readtable(meta_csv, 'TextType', 'string');
+    ids = meta.subject_id;
+    if ~isnumeric(ids), ids = str2double(ids); end
+    names = arrayfun(@(i) sprintf('signal%d.txt', i), ids(:)', 'UniformOutput', false);
+    missing = names(~cellfun(@(f) isfile(fullfile(data_dir, f)), names));
+    if ~isempty(missing)
+        error('Signal files missing for meta_data.csv subjects: %s', strjoin(missing, ', '));
+    end
+    meta_groups = string(meta.group(:));
+    n_subjects = numel(names);
+    fprintf('Using meta_data.csv: %d subjects in its row order (%s ... %s).\n', ...
+        n_subjects, names{1}, names{end});
+else
 files = dir(fullfile(data_dir, 'signal*.txt'));
 if isempty(files)
     error('No signal*.txt files found in %s', data_dir);
@@ -41,6 +64,7 @@ names = names(order);
 n_subjects = numel(names);
 
 fprintf('Found %d signal files (%s ... %s).\n', n_subjects, names{1}, names{end});
+end
 
 %% ---------- Build the stacked matrix ----------
 first = readmatrix(fullfile(data_dir, names{1}));
@@ -90,6 +114,13 @@ if exist(mapping_csv, 'file')
             n_subjects, height(mapping), mapping_csv);
     end
     fprintf('Block count matches the %d subjects in the mapping file.\n', height(mapping));
+    if ~isempty(meta_groups)
+        bad = find(strtrim(string(mapping.genotype)) ~= strtrim(meta_groups));
+        if ~isempty(bad)
+            error('Group differs between %s and meta_data.csv at block(s) %s.', mapping_csv, mat2str(bad'));
+        end
+        fprintf('Groups in the mapping file match meta_data.csv block by block.\n');
+    end
 end
 
 %% ---------- Write (NaN corner cells as empty fields, as before) ----------
@@ -108,4 +139,5 @@ end
 fclose(fid);
 
 fprintf('Wrote %d matrices to %s\n', n_blocks, fullfile(out_dir, 'merged.csv'));
+writelines(string(names(:)), fullfile(out_dir, 'merged_block_order.txt'));   % was announced but never written
 fprintf('Block order written to merged_block_order.txt\n');
