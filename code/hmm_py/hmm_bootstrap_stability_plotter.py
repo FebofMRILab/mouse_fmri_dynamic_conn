@@ -13,8 +13,8 @@ otherwise omitted or labelled "not available".
 Input
     bootstrap_stability_subject_state.csv   (one row per subject x state);
     default: <model folder>/hmm_bootstrap_stability/ of the reported fit
-    (hmm_model_selection.py, same settings as hmm_config.m: HMM-PCA rank 15,
-    K = 4). The file must carry the fit ID in <model folder>/fit_id.txt.
+    (hmm_model_selection.py, same settings as hmm_config.m: the primary or
+    secondary reported model, hmm_v2/MODEL_*.env). The file must carry the fit ID in <model folder>/fit_id.txt.
 
 Outputs (in --out_dir)
     FigS_bootstrap_attrition.{pdf,png}   main supplementary figure:
@@ -370,7 +370,8 @@ def fig_attrition(df, states, groups, out_dir):
     ax.set_xlim(-0.02, 1.02)
     ax.legend(handles=state_handles(states) + [NEAR_STATIC_HANDLE],
               loc="best", frameon=False)
-    ax.set_title("Occupancy criterion")
+    ax.set_title(" ")
+    #ax.set_title("Occupancy criterion")
     panel_label(ax, "C")
 
     # D. bootstrap success
@@ -385,7 +386,8 @@ def fig_attrition(df, states, groups, out_dir):
     ax.set_ylabel(f"Successful resamples\n(fraction of {N_BOOT})")
     ax.set_ylim(min(0.0, boot.bootstrap_success_fraction.min() - 0.05),
                 1.04)
-    ax.set_title("Bootstrap success (Neff-passing only)")
+    ax.set_title(" ")
+    # ax.set_title("Bootstrap success (Neff-passing only)")
     ax.legend(handles=group_handles(groups), loc="lower left",
               frameon=False, ncol=2, handletextpad=0.2, columnspacing=0.6)
     panel_label(ax, "D")
@@ -403,7 +405,8 @@ def fig_attrition(df, states, groups, out_dir):
             fontsize=6.5, color="grey")
     ax.set_ylim(0, 1)
     ax.set_ylabel("Edge-set Jaccard")
-    ax.set_title("Edge-set stability by comparison")
+    ax.set_title(" ")
+    #ax.set_title("Edge-set stability by comparison")
     ax.legend(handles=handles, loc="upper center",
               bbox_to_anchor=(0.5, -0.12), ncol=2, frameon=False,
               handlelength=1.0)
@@ -423,7 +426,8 @@ def fig_attrition(df, states, groups, out_dir):
     ax.set_ylabel(f"Edge-set Jaccard vs full data\n"
                   f"(median, {CI_LEVEL} interval)")
     ax.set_ylim(0, 1)
-    ax.set_title("Stability depends on occupancy")
+    ax.set_title(" ")
+    #ax.set_title("Stability depends on occupancy")
     # below the axis, as in panel E, so it cannot cover the Spearman box
     ax.legend(handles=state_handles(states) + [NEAR_STATIC_HANDLE],
               loc="upper center", bbox_to_anchor=(0.5, -0.24), ncol=2,
@@ -452,7 +456,8 @@ def fig_stability(df, states, groups, out_dir):
             fontsize=6.5, color="grey")
     ax.set_ylim(0, 1)
     ax.set_ylabel("Edge-set Jaccard vs full data")
-    ax.set_title("Edge-set stability by group")
+    ax.set_title(" ")
+    #ax.set_title("Edge-set stability by group")
     state_ticks(ax, states, ana)
     panel_label(ax, "A")
 
@@ -463,7 +468,8 @@ def fig_stability(df, states, groups, out_dir):
     ax.set_ylim(min(-0.05, ana.median_nodal_strength_rank_correlation.min()
                     - 0.05), 1)
     ax.set_ylabel("Nodal-strength Spearman ρ vs full data")
-    ax.set_title("Nodal-strength rank stability by group")
+    ax.set_title(" ")
+    #ax.set_title("Nodal-strength rank stability by group")
     state_ticks(ax, states, ana)
     ax.legend(handles=group_handles(groups) + [NEAR_STATIC_HANDLE],
               loc="lower right", frameon=False, ncol=2, handletextpad=0.2,
@@ -475,7 +481,8 @@ def fig_stability(df, states, groups, out_dir):
     handles = metric_boxes(ax, ana, mets, states)
     ax.axhline(0, color="grey", ls=":", lw=0.9)
     ax.set_ylabel("Nodal-strength Spearman ρ")
-    ax.set_title("Rank stability by comparison")
+    ax.set_title(" ")
+    #ax.set_title("Rank stability by comparison")
     ax.legend(handles=handles, loc="upper center",
               bbox_to_anchor=(0.5, -0.12), ncol=2, frameon=False,
               handlelength=1.0)
@@ -491,7 +498,8 @@ def fig_stability(df, states, groups, out_dir):
     ax.set_ylabel(f"Nodal-strength ρ vs full data\n"
                   f"(median, {CI_LEVEL} interval)")
     ax.set_ylim(None, 1)
-    ax.set_title("Rank stability vs Neff")
+    ax.set_title(" ")
+    #ax.set_title("Rank stability vs Neff")
     ax.legend(handles=state_handles(states), loc="lower right",
               frameon=False)
     panel_label(ax, "D")
@@ -511,7 +519,8 @@ def fig_occupancy(df, states, groups, out_dir, p):
     ax.axhline(MIN_NEFF, color="black", ls="--", lw=0.8)
     neff_log_axis(ax, "y")
     ax.set_ylabel("Neff (log)")
-    ax.set_title("Effective sample size")
+    ax.set_title(" ")
+    #ax.set_title("Effective sample size")
     panel_label(ax, "A")
 
     ax = axes[0, 1]
@@ -526,7 +535,8 @@ def fig_occupancy(df, states, groups, out_dir, p):
     ax = axes[1, 0]
     strip_by_group(ax, df, "covariance_effective_rank", states, groups)
     ax.set_ylabel("Entropy effective rank")
-    ax.set_title("Covariance effective rank")
+    ax.set_title(" ")
+    #ax.set_title("Covariance effective rank")
     panel_label(ax, "C")
 
     # D. subject-level dominance
@@ -548,7 +558,8 @@ def fig_occupancy(df, states, groups, out_dir, p):
     ax.set_xticklabels(groups, rotation=45, ha="right")
     ax.set_ylim(0, 1.04)
     ax.set_ylabel("Max FO across states (per subject)")
-    ax.set_title("State dominance per subject")
+    ax.set_title(" ")
+    #ax.set_title("State dominance per subject")
     ax.legend(handles=group_handles(groups), loc="upper left",
               bbox_to_anchor=(1.0, 1.0), frameon=False)
     panel_label(ax, "D")
@@ -619,7 +630,7 @@ def group_models(df, groups):
 # ------------------------------------------------------------------
 # Tables
 # ------------------------------------------------------------------
-def build_tables(df, states, groups):
+def build_tables(df, states, groups, tested=None):
     # A. state summary
     rows = []
     for k in states:
@@ -703,8 +714,9 @@ def build_tables(df, states, groups):
             rows.append(r)
     tD = pd.DataFrame(rows)
 
-    # E. group models
-    tE = group_models(df, groups)
+    # E. group models: only the states the fit-selection rule allows
+    tested = states if tested is None else tested
+    tE = group_models(df[df.state.astype(int).isin(tested)], groups) if tested else None
 
     # F. near-static subject-states
     ns = df[df.near_static].copy()
@@ -940,7 +952,8 @@ def write_docx(tables, path, df, p):
               "by subject, because states are nested within subjects. The "
               "Wald test is the joint test of all group terms. β for "
               "log Neff is the change in the stability metric per unit "
-              "increase in log Neff. Analyzable subject-states only.")
+              "increase in log Neff. Analyzable subject-states only, in the "
+              "states that recur across fits (fit-selection rule).")
     add_table("Table S-F. Near-static subject-states "
               f"(FO ≥ {NEAR_STATIC_FO}).", tF,
               "These subjects spent most of the scan in one state, so the "
@@ -965,6 +978,13 @@ def main():
 
     df = pd.read_csv(args.csv)
     FIT_ID = sel.check_fit_id(df, os.path.basename(args.csv)) or "not recorded"
+    # Fit-selection rule (hmm_v2/FIT_SELECTION_RULE.md): the group model of
+    # Table S-E uses only the states that recur across fits; everything else in
+    # this script is descriptive and keeps every state.
+    SCOPE = sel.inference_scope()
+    print(SCOPE["source"])
+    sel.fresh_output_dir(args.out_dir, ["FigS_bootstrap_*", "TableS_*.csv",
+                                        "TableS_bootstrap_stability.docx", "neff_covariates.csv"])
     bools = ["passes_Neff", "valid_original_network", "analyzable",
              "split_half_valid", "near_static"]
     for c in bools:
@@ -998,7 +1018,8 @@ def main():
     fig_stability(df, states, groups, args.out_dir)
     fig_occupancy(df, states, groups, args.out_dir, p)
 
-    tables = build_tables(df, states, groups)
+    tables = build_tables(df, states, groups,
+                          tested=sel.tested_states(states, SCOPE))
     for name, t in zip("ABCDEF", tables):
         if t is not None:
             t.to_csv(os.path.join(args.out_dir, f"TableS_{name}.csv"),
@@ -1012,8 +1033,8 @@ def main():
                index=False)
 
     if tables[4] is None:
-        print("statsmodels not installed: Table S-E skipped "
-              "(pip install statsmodels).")
+        print("Table S-E skipped: no state to test under the fit-selection rule, "
+              "or statsmodels not installed.")
     else:
         with pd.option_context("display.width", 200,
                                "display.max_columns", 20):

@@ -14,13 +14,19 @@ Per cohort (Mouse, A Gaussian, B events, C switching, C_strong):
                       dfc_confound_checks.py): the time-scale discriminator
   Bursts / FC change  burst_z and fc_change_z (as dfc_confound_checks.py) and
                       the kurtosis of the co-fluctuation magnitude (RSS)
-  PCA-HMM             the pre-specified decision from analyze_confirm_lowrank.py
+  HMM                 the pre-specified decision from analyze_confirm_lowrank.py
                       (run automatically if its output is missing): cells with
-                      state structure, best cell, calibrated median
-  State recovery      C and C_strong only: how well the lowrank-15 full-fit
-                      state time courses match the simulated states (best
-                      one-to-one matching; chance level from circularly
-                      shifted truths)
+                      state structure, best cell, calibrated median. Two
+                      families, each with its own Holm correction as in the
+                      mouse runs: step 6's cells (HMM-PCA rank 15/25, K 2-4;
+                      hmm_confirm_*) and the primary model's cells (the step 5
+                      candidate, Gaussian PCA-25 at K 2-4, as step 6b;
+                      hmm_candidate_sim_* and the mouse's hmm_confirm_candidate;
+                      added 28 Oct 2026, D38)
+  State recovery      C and C_strong only: how well the full-fit state time
+                      courses (lowrank 15, and the primary model) match the
+                      simulated states (best one-to-one matching; chance level
+                      from circularly shifted truths)
 Mouse vs each cohort: two-sided Mann-Whitney on every per-mouse measure.
 
 Outputs in --out_dir (default positive_control_summary):
@@ -131,6 +137,44 @@ def read_dfc(dfc_dir):
     return dict(d=d, H=H, tr_dcc=tr_dcc)
 
 
+def model_label(model):
+    """lowrank_15 -> 'lowrank 15' (row names as before); gaussian_pca_25 -> 'Gaussian
+    PCA-25'; gaussian_full -> 'Gaussian, all ROIs'."""
+    if model.startswith("gaussian_pca_"):
+        return f"Gaussian PCA-{model.rsplit('_', 1)[1]}"
+    if model == "gaussian_full":
+        return "Gaussian, all ROIs"
+    return model.replace("_", " ")
+
+
+def cell_name(model):
+    """Short figure names: r15 (HMM-PCA rank 15), G25 (Gaussian PCA-25), G (all ROIs)."""
+    digits = "".join(ch for ch in model if ch.isdigit())
+    return f"G{digits}" if model.startswith("gaussian") else f"r{digits}"
+
+
+def group_ticks(ax, cells, fontsize=6.5):
+    """K as tick labels, the model's short name under each group, a divider between models."""
+    ax.set_xticks(range(len(cells)))
+    ax.set_xticklabels([str(k) for _, k in cells], fontsize=fontsize)
+    groups = {}
+    for i, (m, _) in enumerate(cells):
+        groups.setdefault(m, []).append(i)
+    for j, (m, idx) in enumerate(groups.items()):
+        ax.text(float(np.mean(idx)), -0.17, cell_name(m), transform=ax.get_xaxis_transform(),
+                ha="center", va="top", fontsize=fontsize + 0.5, color=SECONDARY)
+        if j:
+            ax.axvline(idx[0] - 0.5, color=GRID, lw=0.8, zorder=0)
+    ax.set_xlim(-0.6, len(cells) - 0.4)
+
+
+def cell_order(cell):
+    """Step 6's HMM-PCA cells first (by rank), then the primary model's, each by K."""
+    model, K = cell
+    digits = int("".join(ch for ch in model if ch.isdigit()) or 0)
+    return (model.startswith("gaussian"), digits, K)
+
+
 def read_hmm(root, analyze_script):
     f = os.path.join(root, "analysis", "confirm_cells.csv")
     if not os.path.isfile(f) and os.path.isdir(os.path.join(root, "observed")):
@@ -191,8 +235,11 @@ def main():
     ap.add_argument("--sim_dir", default="sim_positive_control")
     ap.add_argument("--mouse_dfc", default="dfc_dcc_cpca")
     ap.add_argument("--mouse_hmm", default="hmm_confirm_lowrank")
+    ap.add_argument("--mouse_hmm_primary", default="hmm_confirm_candidate",
+                    help="the mouse's step 6b run (the primary model's cells)")
     ap.add_argument("--dfc_prefix", default="dfc_sim_")
     ap.add_argument("--hmm_prefix", default="hmm_confirm_sim_")
+    ap.add_argument("--hmm_primary_prefix", default="hmm_candidate_sim_")
     ap.add_argument("--analyze_script", default="analyze_confirm_lowrank.py")
     ap.add_argument("--out_dir", default="positive_control_summary")
     args = ap.parse_args()
@@ -202,6 +249,8 @@ def main():
     cohorts = ["Mouse", "A", "B", "C", "C_strong"]
     dfc_dirs = {"Mouse": args.mouse_dfc, **{c: args.dfc_prefix + c for c in cohorts[1:]}}
     hmm_dirs = {"Mouse": args.mouse_hmm, **{c: args.hmm_prefix + c for c in cohorts[1:]}}
+    hmmp_dirs = {"Mouse": args.mouse_hmm_primary,
+                 **{c: args.hmm_primary_prefix + c for c in cohorts[1:]}}
 
     # ---- per-mouse measures
     diag = []
@@ -260,32 +309,38 @@ def main():
                                  else np.nan, n=len(dd), note=""))
 
     hmm = {c: read_hmm(hmm_dirs[c], args.analyze_script) for c in cohorts}
-    for c in cohorts:
-        T = hmm[c]
-        if T is None:
-            continue
-        best = T.sort_values("p_calibrated_holm").iloc[0]
-        rows.append(dict(cohort=c, measure="HMM cells with state structure",
-                         value=int(T.state_structure.astype(bool).sum()), n=len(T),
-                         ci_low=np.nan, ci_high=np.nan, p=float(best.p_calibrated_holm),
-                         note=f"best cell {best.model} K={int(best.K)}, calibrated median "
-                              f"{best.calibrated_median:.3f}; p = its Holm p"))
+    hmmp = {c: read_hmm(hmmp_dirs[c], args.analyze_script) for c in cohorts}
+    for family, H_ in [("", hmm), (", primary model", hmmp)]:
+        for c in cohorts:
+            T = H_[c]
+            if T is None:
+                continue
+            best = T.sort_values("p_calibrated_holm").iloc[0]
+            rows.append(dict(cohort=c, measure=f"HMM cells with state structure{family}",
+                             value=int(T.state_structure.astype(bool).sum()), n=len(T),
+                             ci_low=np.nan, ci_high=np.nan, p=float(best.p_calibrated_holm),
+                             note=f"best cell {best.model} K={int(best.K)}, calibrated median "
+                                  f"{best.calibrated_median:.3f}; p = its Holm p"))
 
     truth_rec = []
-    for c in ["C", "C_strong"]:
-        tf = os.path.join(args.sim_dir, c, "truth_states.csv")
-        if not os.path.isfile(tf):
-            continue
-        truth = pd.read_csv(tf)
-        for gf in sorted(glob.glob(os.path.join(hmm_dirs[c], "observed", "gamma_lowrank_15_K*.mat"))):
-            r = state_recovery(gf, truth, rng)
-            if r:
-                truth_rec.append(dict(cohort=c, **r))
-                rows.append(dict(cohort=c, measure=f"state recovery, lowrank 15, K={r['K']}",
-                                 value=r["recovery"], ci_low=r["chance_median"],
-                                 ci_high=r["chance95"], p=np.nan, n=np.nan,
-                                 note="mean matched correlation; ci_low/ci_high = chance "
-                                      "median / 95th percentile"))
+    truths = {c: pd.read_csv(os.path.join(args.sim_dir, c, "truth_states.csv"))
+              for c in ["C", "C_strong"]
+              if os.path.isfile(os.path.join(args.sim_dir, c, "truth_states.csv"))}
+    # step 6's rank 15 full fits first (same order and random draws as before the primary
+    # model was added), then the primary model's (its folder holds only its gamma files)
+    for dirs, pattern in [(hmm_dirs, "gamma_lowrank_15_K*.mat"), (hmmp_dirs, "gamma_*_K*.mat")]:
+        for c, truth in truths.items():
+            for gf in sorted(glob.glob(os.path.join(dirs[c], "observed", pattern))):
+                model = os.path.basename(gf)[len("gamma_"):].rsplit("_K", 1)[0]
+                r = state_recovery(gf, truth, rng)
+                if r:
+                    truth_rec.append(dict(cohort=c, model=model, **r))
+                    rows.append(dict(cohort=c, measure=f"state recovery, {model_label(model)}, "
+                                                       f"K={r['K']}",
+                                     value=r["recovery"], ci_low=r["chance_median"],
+                                     ci_high=r["chance95"], p=np.nan, n=np.nan,
+                                     note="mean matched correlation; ci_low/ci_high = chance "
+                                          "median / 95th percentile"))
     R = pd.DataFrame(rows)
     R.to_csv(os.path.join(args.out_dir, "positive_control_table.csv"), index=False)
     TR = pd.DataFrame(truth_rec)
@@ -331,18 +386,22 @@ def main():
         col["Coupling half-life vs surrogates"] = (
             f"{r.value:.2f}x ({r.ci_low:.1f} vs {r.ci_high:.1f} s, n = {int(r.n)})"
             if r is not None and r.n > 0 else ("no dynamic mice" if r is not None else ""))
-        r = get(c, "HMM cells with state structure")
-        if r is not None:
-            col["Reproducible HMM states"] = (f"{'yes' if r.value > 0 else 'no'} "
-                                              f"({int(r.value)}/{int(r.n)} cells; best Holm p "
-                                              f"{fmt_p(r.p)})")
-        else:
-            col["Reproducible HMM states"] = ""
+        for family in ["", ", primary model"]:
+            r = get(c, f"HMM cells with state structure{family}")
+            if r is not None:
+                col[f"Reproducible HMM states{family}"] = (
+                    f"{'yes' if r.value > 0 else 'no'} ({int(r.value)}/{int(r.n)} cells; "
+                    f"best Holm p {fmt_p(r.p)})")
+            elif not family:
+                col["Reproducible HMM states"] = ""
         if not TR.empty and c in set(TR.cohort):
-            t = TR[(TR.cohort == c)].set_index("K")
-            col["HMM recovers the true states"] = "; ".join(
-                f"K={k}: {t.loc[k, 'recovery']:.2f} (chance {t.loc[k, 'chance95']:.2f})"
-                for k in t.index)
+            for model in TR[TR.cohort == c].model.unique():
+                t = TR[(TR.cohort == c) & (TR.model == model)].set_index("K").sort_index()
+                row = ("HMM recovers the true states" if model == "lowrank_15"
+                       else f"HMM recovers the true states, {model_label(model)}")
+                col[row] = "; ".join(
+                    f"K={k}: {t.loc[k, 'recovery']:.2f} (chance {t.loc[k, 'chance95']:.2f})"
+                    for k in t.index)
         r = get(c, "burst_z")
         col["Shared bursts (burst_z)"] = f"{r.value:.2f}" if r is not None else ""
         r = get(c, "fc_change_z")
@@ -355,7 +414,9 @@ def main():
     pd.set_option("display.max_colwidth", 60)
     print("\n" + S.to_string())
 
-    figure(P, R, hmm, TR, cohorts, args.out_dir)
+    hmm_all = {c: (pd.concat([t for t in (hmm[c], hmmp[c]) if t is not None], ignore_index=True)
+                   if hmm[c] is not None or hmmp[c] is not None else None) for c in cohorts}
+    figure(P, R, hmm_all, TR, cohorts, args.out_dir)
     matching_figure(args, rng)
     print(f"\nOutputs in {args.out_dir}/")
 
@@ -422,8 +483,7 @@ def figure(P, R, hmm, TR, cohorts, out_dir):
     for c in cohorts:
         if hmm.get(c) is not None:
             cells += [(m, int(k)) for m, k in zip(hmm[c].model, hmm[c].K)]
-    cells = sorted(set(cells), key=lambda x: (int("".join(ch for ch in x[0] if ch.isdigit()) or 0),
-                                              x[1]))
+    cells = sorted(set(cells), key=cell_order)
     have = [c for c in cohorts if hmm.get(c) is not None]
     if cells and have:
         w = 0.72 / max(len(have), 1)
@@ -438,30 +498,31 @@ def figure(P, R, hmm, TR, cohorts, out_dir):
                 ax.plot(x, r.calibrated_median, "o", ms=3.8, mec=COLORS[c],
                         mfc=COLORS[c] if bool(r.state_structure) else "white", mew=1.0)
         ax.axhline(0, color=BASELINE, lw=0.8, zorder=0)
-        ax.set_xticks(range(len(cells)))
-        ax.set_xticklabels([f"r{''.join(ch for ch in m if ch.isdigit())}\nK{k}" for m, k in cells],
-                           fontsize=5.8)
+        group_ticks(ax, cells)
+        ax.set_xlabel("K, by model", fontsize=8.5, labelpad=11)
     else:
         ax.text(0.5, 0.5, "not available yet", transform=ax.transAxes, ha="center", fontsize=7,
                 color=MUTED)
     ax.set_ylabel("Calibrated similarity gain", fontsize=8.5)
     ax.tick_params(axis="y", labelsize=7)
-    ax.set_title("PCA-HMM decision", fontsize=8, loc="left")
+    ax.set_title("HMM decision", fontsize=8, loc="left")
     sns.despine(ax=ax)
 
     # state recovery
     ax = axes[1, 3]
     if not TR.empty:
+        fits = sorted({(m, int(k)) for m, k in zip(TR.model, TR.K)}, key=cell_order)
+        pos = {f: i for i, f in enumerate(fits)}
         for j, c in enumerate(["C", "C_strong"]):
-            t = TR[TR.cohort == c].sort_values("K")
+            t = TR[TR.cohort == c]
             if t.empty:
                 continue
-            x = t.K.to_numpy() + (j - 0.5) * 0.22
-            ax.bar(x, t.recovery, width=0.2, color=COLORS[c], label=LABELS[c])
+            x = np.array([pos[(m, int(k))] for m, k in zip(t.model, t.K)]) + (j - 0.5) * 0.36
+            ax.bar(x, t.recovery, width=0.34, color=COLORS[c], label=LABELS[c])
             for xi, ch in zip(x, t.chance95):
-                ax.plot([xi - 0.1, xi + 0.1], [ch, ch], color=INK, lw=1.0)
-        ax.set_xticks(sorted(TR.K.unique()))
-        ax.set_xlabel("K (lowrank 15)", fontsize=8.5)
+                ax.plot([xi - 0.17, xi + 0.17], [ch, ch], color=INK, lw=1.0)
+        group_ticks(ax, fits)
+        ax.set_xlabel("K, by model (full fits)", fontsize=8.5, labelpad=11)
         ax.set_ylim(0, 1.3)
         ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
         ax.legend(frameon=False, fontsize=6, loc="upper left", ncol=2, handlelength=1,
@@ -480,9 +541,11 @@ def figure(P, R, hmm, TR, cohorts, out_dir):
              "events, C state switching (B and C matched to the mouse DCC excess); C strong: the "
              "same mice as C, larger state separation.\nA-C: calibrated excess over stationary "
              "replicas. D: mice with DCC a z > 1.645. G: calibrated median (95% CI) per model "
-             "and K; filled = state structure by the pre-specified rule.\nH: bars = "
-             "best-matched correlation with the simulated states; black lines = chance "
-             "(95th percentile).", fontsize=6.3, color=SECONDARY, linespacing=1.5)
+             "and K (r15/r25: HMM-PCA rank, step 6 cells; G25: Gaussian PCA-25, the primary "
+             "model's cells, own Holm family);\nfilled = state structure by the pre-specified "
+             "rule. H: bars = best-matched correlation of the full-fit state time courses with "
+             "the simulated states; black lines = chance (95th percentile).",
+             fontsize=6.3, color=SECONDARY, linespacing=1.5)
     for ext in ("pdf", "png"):
         fig.savefig(os.path.join(out_dir, f"FigS_positive_controls.{ext}"), bbox_inches="tight",
                     dpi=450 if ext == "png" else None)

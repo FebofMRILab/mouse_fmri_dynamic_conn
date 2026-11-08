@@ -45,6 +45,9 @@ if [[ -d hmm_py ]]; then
     echo "== 3. HMM statistics and figure scripts (updated vs previous, simulated data)"
     (cd hmm_py && $PY tests/test_hmm_python_stats.py "$OUT/hmm_py_work") 2>&1 \
         | tail -40 | tee "$OUT/test_hmm_python_stats_output.txt"
+    echo "== 3b. Agreement between the two reported models (MODEL_SELECTION_RULE.md amendment 2)"
+    (cd hmm_py && $PY tests/test_model_agreement.py "$OUT/hmm_agreement_work") 2>&1 \
+        | tail -15 | tee "$OUT/test_model_agreement_output.txt"
 fi
 if [[ -d dfc ]]; then
     echo "== 4. DFC plotting group statistics (updated vs previous)"

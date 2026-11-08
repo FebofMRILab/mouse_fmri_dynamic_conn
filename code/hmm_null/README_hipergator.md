@@ -69,6 +69,8 @@ sacct -j <jobid> --format=JobID,Elapsed,MaxRSS,State
 - **A license error in a chunk** means the base MATLAB license, not PCT. Lower
   the throttle (`%15` to e.g. `%8`) in `hmm_chunks.sbatch`.
 
+**Subjects and TR (E49, 26 Oct 2026).** `run4b_hmm_splithalf_null.m` had the human settings hard-coded (`n_subjects = 58`, `TR_sec = 3`), so on the mouse data it loaded signal1–58 only (with the warning "N more signal file(s) exist ... Check n_subjects"). It now reads `HMM_N_SUBJECTS` (default 95) and `HMM_TR` (default 2), like `run4c`. For the human data: `HMM_N_SUBJECTS=58 HMM_TR=3`. Check a run with `tail -n +2 hmm_raw_timeseries_null/metadata_aligned.csv | wc -l` (95 for the mice).
+
 ## Stricter null: IAAFT
 
 `HMM_NULL=iaaft` swaps the phase-randomised surrogates for multivariate IAAFT
@@ -92,6 +94,26 @@ HMM_NULL=iaaft HMM_K_VALUES="2:4" bash submit_hmm_chunks.sh 1
 With 10 null repetitions and K = 2–4 that is 30 null jobs (60 fits); the
 observed jobs load from checkpoints. Afterwards `collect_sensitivity_null.m`
 also writes `null_comparison_phase_vs_iaaft.csv`.
+
+**Phase, then IAAFT, without waiting at the terminal** (`run_nulls_in_sequence.sh`,
+25 Oct 2026). Each stage is submitted by a short 1-core launcher job that starts
+when every job of the previous stage has ended (`afterany`), so stages never
+overlap (16-core limit) and IAAFT starts only after the phase run has written
+the observed fits it reuses. It calls the submit scripts unchanged and refuses
+to start if `hmm_raw_timeseries_null/` or `hmm_confirm_lowrank/` already exists
+(their checkpoints would be reused: rename them first, README run order, E48).
+
+```bash
+bash run_nulls_in_sequence.sh both      # list models -> split-half phase (all) -> confirmatory phase
+                                        #   -> split-half IAAFT (model 1, K 2-4) + collect -> confirmatory IAAFT
+bash run_nulls_in_sequence.sh split     # split-half only;  bash run_nulls_in_sequence.sh confirm  # confirmatory only
+IAAFT_MODELS=all bash run_nulls_in_sequence.sh split   # IAAFT for every model (also IAAFT_K="2:6")
+cat logs/null_sequence.log              # one line per stage with its job IDs
+```
+
+Tested with a mock `sbatch` (each stage depends on all job IDs of the previous
+one; HMM_* settings from the calling shell do not reach the jobs, HMM_TOOLBOX
+is kept; one collect job per null).
 
 ## Activation-state diagnostic: zeromean = 0
 

@@ -13,8 +13,12 @@ the Python statistics and figures without the real data:
 and the same run4d data in the previous formats, for the previous scripts:
   <base>/signals/{hmm,pcahmm}_{...}_all_K_all_PCA.csv with pca_components = 50
 
-    python tests/make_mock_inputs.py <base> [K]      (K = 3 by default; the
-    previous scripts were written for K = 3)
+    python tests/make_mock_inputs.py <base> [K] [model]
+    K      3 by default (the previous scripts were written for K = 3)
+    model  lowrank15 (default: HMM-PCA rank 15, the formats above) or pca25
+           (Gaussian HMM on 25 PCs, the primary model's formats:
+           hmmmar_simple_k<K>_pca25/ and hmm_*_all_K_all_PCA.csv with
+           pca_components = 25; no previous-format files)
 """
 import os
 import sys
@@ -29,8 +33,12 @@ FIT_ID = "a3f1" * 16
 
 base = sys.argv[1] if len(sys.argv) > 1 else "mock"
 K = int(sys.argv[2]) if len(sys.argv) > 2 else 3
+MODEL = sys.argv[3] if len(sys.argv) > 3 else "lowrank15"
+if MODEL not in ("lowrank15", "pca25"):
+    raise SystemExit("model must be lowrank15 or pca25")
 sig = os.path.join(base, "signals")
-model = os.path.join(sig, f"hmmmar_simple_k{K}_hmmpca15")
+model = os.path.join(sig, f"hmmmar_simple_k{K}_hmmpca15" if MODEL == "lowrank15"
+                     else f"hmmmar_simple_k{K}_pca25")
 for d in (os.path.join(model, "hmm_raw_posthoc_graph_metrics"),
           os.path.join(model, "hmm_bootstrap_stability")):
     os.makedirs(d, exist_ok=True)
@@ -120,6 +128,10 @@ pd.DataFrame(bs).to_csv(os.path.join(model, "hmm_bootstrap_stability",
 
 for kind, rows in (("switching_rates", sw), ("maxFO", mf), ("dwell_times", dw)):
     d = pd.DataFrame(rows)
+    if MODEL == "pca25":
+        d.assign(pca_components=25, model_type="pca").to_csv(
+            os.path.join(sig, f"hmm_{kind}_all_K_all_PCA.csv"), index=False)
+        continue
     d.assign(lowrank_components=15, model_type="lowrank").to_csv(
         os.path.join(sig, f"hmm_{kind}_all_K_all_lowrank.csv"), index=False)
     old = d.drop(columns=["fit_id"]).assign(pca_components=50)      # previous format

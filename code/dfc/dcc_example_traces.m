@@ -32,7 +32,7 @@ function info = dcc_example_traces(data_dir, dcc_code_dir, dfc_dir, out_dir, mou
 % Writes: dcc_example_traces.csv, dcc_example_pair_sd.csv,
 % dcc_example_params.csv, dcc_example_info.txt.
 
-if nargin < 3 || isempty(dfc_dir), dfc_dir = 'dfc_dcc_cpca_pca15'; end
+if nargin < 3 || isempty(dfc_dir), dfc_dir = 'dfc_dcc_cpca'; end
 if nargin < 4 || isempty(out_dir), out_dir = fullfile(dfc_dir, 'dcc_example'); end
 if nargin < 5, mouse_id = []; end
 here = fileparts(mfilename('fullpath'));

@@ -8,7 +8,55 @@
 - **MATLAB Statistics Toolbox** (`corr` with `'Type','Spearman'`, `prctile`, `iqr`) in run5B.
 - **SciPy and statsmodels** (`scipy.stats.wilcoxon`, `multipletests(method='holm')`) in the drift test, as in the confirmatory analysis.
 
-## Reported model: HMM-PCA, rank 15, K = 4 (your decision, 2 Oct 2026)
+## Reported models on the ROI-mean signals (27 Oct 2026; D33)
+
+- **Decision (PI, 27 Oct 2026).** Two models are reported. The primary (main text) is a Gaussian HMM on 25 principal components (`options.pca = 25`), K = 3, which passed step 6b. The secondary is HMM-PCA (`options.lowrank = 15`), K = 2, which passed step 6.
+  - `hmm_null/MODEL_SELECTION_RULE.md` item 6 would have put the secondary in the main text (larger median c). The PI chose by precision instead, after the confirmation results and before any group result. That rule's amendment 1 records the deviation; `FIT_SELECTION_RULE.md` amendment 1 applies the fit rule to each model.
+  - The section below ("HMM-PCA, rank 15, K = 4") is the choice on the eigenvariate signals and no longer decides anything.
+- **One place for each model.** `MODEL_PRIMARY.env` and `MODEL_SECONDARY.env` are read by:
+  - `hmm_config.m`: the primary model is the default; `HMM_K` / `HMM_LOWRANK` / `HMM_PCA` override it, and the file is required;
+  - `hmm_py/hmm_model_selection.py`: same defaults; both models need `inference_scope.csv`;
+  - `hmm_occupancy_drift.py`;
+  - the job scripts, through `hipergator_tests/reported_model.sh primary|secondary`.
+
+  Before this change, five job scripts and the Python defaults hard-coded K = 4 and rank 15.
+- **`hmm_config.m`.** `confirm_gamma` now points to the model's own confirmation run:
+  - step 6 (`hmm_confirm_lowrank/…/gamma_lowrank_<r>_K<K>.mat`) for HMM-PCA;
+  - step 6b (`hmm_confirm_candidate/…/gamma_gaussian_pca_<d>_K<K>.mat`) for a Gaussian model.
+- **`select_reported_fit.m`.**
+  - **Default fits folder:** `hmm_k<K>_pca<d>_fits` or `hmm_k<K>_hmmpca<r>_fits`.
+  - **Model check:** it stops unless the fits folder's `model.env` (copied by the array job before fitting) is the model in `hmm_config.m`. Each fit's `options.pca` is checked as well as `lowrank`.
+  - **Previous refit:** the comparison with the 4 Oct 2026 refit is reported as not applicable (`PREVIOUS_REFIT = false`; amendment 1, item 6). Every earlier fit is of the eigenvariate signals.
+  - **Messages:** no longer say "K = 4".
+  - **Tests:** F11 updated; F14 (another model's `model.env` refused) and F15 (a Gaussian PCA model: default folder, selection, a fit with another `options.pca` refused) added. 15/15 in Octave 8.4 with HMM-MAR 023905b.
+- **Fits array.** As well as the per-folder copy, the first fit of each role records the model file in `<signals>/hmm_fits_<role>_model.env`. Any later task stops if the file has changed, even when a new K or dimension would point to a new fits folder (tasks still queued after an edit).
+  - Each array runs at most 8 tasks at once (`--array=1-10%8`), so the two arrays together stay within 16 cores.
+  - Test: `hipergator_tests/tests/test_model_files.sh`, 8/8 (stubs for `matlab`, `sbatch`, `module`).
+- **E50: K = 2 occupancy counted once** (found before running, 27 Oct 2026).
+  - **Flaw.** Each mouse's occupancies sum to 1 over the states. With two states, FO(state 2) = 1 − FO(state 1) for every mouse, and each mouse's drift change in state 2 is minus that in state 1. So the per-state tests are one test counted twice: Welch's ANOVA, the Welch t contrasts with the sign reversed, the permutation p with the same permutations, and the two-sided Wilcoxon of the drift. The code, written for K = 4, would have put both copies in the Holm (and BH) family and doubled the adjusted p.
+  - **Fix in `hmm_occupancy_drift.py`** (the same lines in `hmm_null/analyze_confirm_lowrank.py`):
+    ```python
+    if int(K) == 2 and len(rows) == 2 and complements(ok):
+        # one test: state 2's change is minus state 1's (E50)
+        rows["p_two_sided"] = rows.p_two_sided.iloc[0]
+        rows["p_holm_within_K"] = rows.p_two_sided.iloc[0]
+    ```
+    Here `complements(ok)` checks on the data that the two occupancies sum to 1 within 1e-6. Otherwise both states are tested with Holm and the row is flagged.
+  - **Fix for occupancy** (`hmm_py/hmm_model_selection.fo_test_plan`, used by `hmm_dynamic_stats.py` and the occupancy figure): the second state takes the first state's test (`same_test_as`), with the same check on the data.
+  - **Evidence.**
+    - `hmm_null/tests/hodges_lehmann/test_hodges_lehmann.py` H8 and H9: the K = 2 drift p is counted once in both scripts; the previous code gave 2 × p; K = 3 is unchanged (max diff 2.8e-17); non-complements fall back to Holm.
+    - `hmm_py/tests/test_hmm_python_stats.py` S15: state 2's Welch test computed on its own equals state 1's (same F within 1e-9, same permutation p). The tables carry it once (Holm p = p; contrasts t(2) = −t(1); state 1's q; BH over state 1's contrasts only), and both figure panels show the one p.
+  - **Effect on results already seen.** For step 6's rank 15, K = 2, drift Holm p 0.30 becomes p 0.15 (no drift either way). No pass or fail in step 6 or 6b changes.
+- **New (descriptive): `hmm_state_descriptors.m`** (values in `hmm_state_descriptor_values.m`), run after run5 in the pipeline. It asks whether the states differ mainly in amplitude or in correlation pattern. For each mouse and state, and pooled over mice, it gives:
+  - occupancy, mean ROI variance and global-signal variance, all from HMM-MAR's own state statistic (setxx.m) on the standardised data;
+  - mean correlation;
+  - for each pair of states, the FC pattern r, with r² as the share an affine shift of the correlations explains, and its noise-corrected value. The correction is Spearman's (1904) correction for attenuation, using odd- vs even-numbered mice.
+
+  It uses no group labels and tests nothing. It was proposed because a two-state fit with about half the time in each state could separate high- from low-amplitude periods.
+  - It also writes `state_fc_pooled_upper.csv` (the pooled state FC, equal to `R.state_fc`, upper triangle). `hmm_py/hmm_model_agreement.py` reads it to pair the two models' states (`hmm_null/MODEL_SELECTION_RULE.md` amendment 2, D35).
+  - **Tests:** `tests/test_state_descriptors.m` D1–D7, 7/7 in Octave. It uses simulated amplitude-only, pattern-only and global-signal differences, a weak-FC case for the correction, the pooled FC against `R.state_fc`, and a mouse checked by hand. The workflow test W10 runs the script on a real run4e fit (MATLAB).
+
+## Reported model on the eigenvariate signals: HMM-PCA, rank 15, K = 4 (your decision, 2 Oct 2026; superseded 27 Oct 2026, D33)
 
 - **The model.** `options.lowrank = 15` (HMM-PCA), K = 4.
 - **How K was chosen.** After the pre-specified confirmatory test (`run4c_confirm_lowrank.m`: rank 15/25 × K = 2–4, 30 split-halves, calibrated against stationary replicas, Holm across the six cells). Rank 15 is the rank the spin-echo hypothesis favoured (prediction 1 in `README_confirm_lowrank.md`); the time-stamped plan (`PREREGISTRATION.txt`, written by run4c) names both ranks and all K with no primary cell, so the choice of rank 15 was also made after the results. At rank 15, K = 4 is the only K that met the decision rule (`hmm_confirm_lowrank/analysis/confirm_cells.csv`):
@@ -22,13 +70,27 @@
   Rank 25, K = 2 also met the rule (0.075, Holm p = 0.025). It goes to the Supplement because the paper reports rank 15. The Holm correction across the six cells covers the choice among them; the paper shows all six.
 - **K = 3 before.** K = 3 was the reported model until this decision. It did not meet the rule: its stationary replicas show split-half excess of their own (replica p = 0.03), which the calibration removes. At K = 4 the replicas show none (p = 0.66).
 - **How strong the evidence is.** The calibrated excess at K = 4 is small: 0.051, against 0.19 (event simulation) and 0.22 (switching simulation) at the same cell in the positive control. The weakest state replicates at 0.018 (null 0.005), and 2 of the 6 cells pass. This supports weak but replicable state structure.
-- **Drift.** In the confirmatory full fit at K = 4, no state's occupancy changes between scan halves (Wilcoxon, Holm within K: p ≥ 0.54; 38–55% of mice increase; `confirm_occupancy_drift.csv`). At K = 3, state 1 did (62% of mice decrease, Holm p = 0.008). `hmm_occupancy_drift.py` repeats the test on the reported fit.
+- **Drift.** In the confirmatory full fit at K = 4, no state's occupancy changes between scan halves (Wilcoxon, Holm within K: p ≥ 0.54; 38–55% of mice increase; `confirm_occupancy_drift.csv`). At K = 3, state 1 did (62% of mice decrease, Holm p = 0.008). `hmm_occupancy_drift.py` repeats the test on the reported fit; the 4 Oct 2026 refit differs (see Refits).
 - **Order.** Decided after the confirmatory results were known (K = 3 had been planned), and before any K = 4 group comparison was run. The paper must say the choice of cell was post hoc.
 - **What it replaces.** The fit used before, `hmmmar_simple_k3_pca15`, was PCA to 15 components followed by full-covariance states (`pca = 15`, `lowrank = 0`; read from the fit on HiPerGator). That is a different model from the one the confirmatory test was run on. A K = 3 HMM-PCA folder (`hmmmar_simple_k3_hmmpca15`), if one was made, is not the reported model either.
 - **Defaults.** `hmm_config.m` defaults to K = 4, `lowrank = 15`, `pca = 0`; the output folder is `hmmmar_simple_k4_hmmpca15`. The Python side (`hmm_py/hmm_model_selection.py`, `hmm_occupancy_drift.py`) has the same defaults. run4d's table grid now starts at K = 2 (`HMM_K_VALUES`, was 3–10), so a Supplement fit at rank 25, K = 2 is tabled; folders that do not exist are skipped, as before.
 - **Data folder.** `HMM_OUT_BASE` defaults to `/blue/febo/share/Abeta_Age/rabies/signals` (was `../signals`, relative to the folder MATLAB was started in), and the signal files to its `hmm_signals/` (`HMM_DATA_DIR`). The steps now find the data wherever they are started from.
 - **Fit settings.** run4e fits with the options of the confirmatory full fits (E7).
 - **Refits.** No refit reproduces the confirmatory fit exactly (E8). `tests/check_against_confirmatory.m` measures how close the two are; with a weak fourth state, check it before using the refit.
+  **Result, 4 Oct 2026 (HiPerGator, MATLAB R2026a).** The refit (fit `1783b9c3…`) is a different solution from the confirmatory run's full fit (`ae150f19…`, the fit its drift check used; the confirmatory test itself compared split-half fits): `getGammaSimilarity` 0.43 (1 = identical up to state order). One state is reproduced (state time course r = 0.63, pooled state FC r = 0.97); three are not (time course r = 0.05–0.15, FC r = 0.75–0.77). One refit state drifts between scan halves (median +0.037, 67% of mice increase, Holm p = 0.013). The 4 Oct refit is therefore not used for the paper: the reported fit is chosen by the rule below ("Fit selection"), fixed before any further fit was run (provenance workbook, D25).
+
+## Fit selection (new, 4 Oct 2026; your decision D25)
+
+The rule is in `FIT_SELECTION_RULE.md`, written before the fits it governs. In short: ten independent fits of the same model; the reported fit is the one with the lowest final free energy; group tests only for its states whose pooled state FC recurs (r ≥ 0.9 with the matched state in more than half of the other fits), and for switching rate and max FO only if their per-mouse values agree across fits by the same criterion.
+
+| # | Before | Now | Why |
+|---|---|---|---|
+| S1 | One fit per run of run4e; the reported fit was whichever run came last | `hipergator_tests/run_hmm_fits_array.sbatch`: ten run4e fits, unchanged, each in its own folder (`<signals>/hmm_k4_hmmpca15_fits/fit_NN/`). The job records the rule's SHA-256 before fitting and never overwrites a finished fit. | HMM-MAR reseeds from the clock, so fits differ; one fit cannot show which states are stable. |
+| S2 | No rule for choosing among fits | `select_reported_fit.m`: lowest final free energy (`fehist(end)`), the criterion HMM-MAR uses among its own initialisations (`train/hmmmar_init.m`). Matching with HMM-MAR's `getGammaSimilarity`. Per-mouse agreement is the statistic of HMM-MAR's `hmmtestretest.m`, computed on the saved fits. Writes `selection/` and `inference_scope.csv` in the chosen fit's folder. Only `fit_01`–`fit_10` are candidates. If no state recurs, nothing is tested (item 9). It refuses a changed rule file, fits made with other options (including `initrep`), fewer than 8 valid fits, and a second selection that differs from the first. The array and selection jobs ignore `HMM_*` settings other than the toolbox path, so a leaked `HMM_MODEL_DIR` or `HMM_INITREP` cannot change the fits. | The choice uses no group labels or results, so it cannot be fit-shopping. `hmmtestretest` itself refits inside one call and keeps no run4e outputs, so its statistic is applied to the run4e fits instead. |
+| S3 | Every state tested | `hmm_py` reads `inference_scope.csv` (`hmm_model_selection.inference_scope`): tests, and the Holm and BH families, cover only recurring states and the whole-fit outcomes that pass (including the group model of bootstrap Table S-E). Descriptive tables keep every state. The drift test still covers every state. Without the file, the reported model is refused. Each script first deletes its own earlier test outputs. | Group differences in a state that changes from fit to fit would describe the fit, not the mice. |
+| S4 | `run_hmm_pipeline.sbatch` always fitted | `SKIP_FIT=1` runs every later step on an existing fit; `run_selected_fit.sh` submits it for the chosen fit, with outputs inside `fit_NN/`. | One fit for every later step; the 4 Oct refit's outputs stay untouched. |
+
+Tests: `tests/test_select_reported_fit.m` (F1–F13, simulated fits with a known answer; MATLAB or Octave; 13 of 13 passed here in Octave 8.4) and `tests/test_select_on_run4e.m` (R1–R4, eight real run4e fits of the simulated cohort; MATLAB, in the HiPerGator test job). `hmm_py`: S11–S14. An independent review (assistant sub-agent, before any fit) found nine issues in the first version; all were fixed and are covered by F12, F13, S13 and S14.
 
 ## All steps: one configuration and one fit ID
 
@@ -220,14 +282,14 @@ The MATLAB script now includes the Python v2 diagnostics. It runs on the same fi
 
 ## What needs rerunning
 
-1. **The reported model (HMM-PCA 15, K = 4)**, in this order. `hipergator_tests/run_hmm_pipeline.sbatch` runs all seven.
-   1. run4e;
+1. **The reported model (HMM-PCA 15, K = 4)**: ten fits (`run_hmm_fits_array.sbatch`), the selection (`run_select_fit.sbatch`), then, on the chosen fit only, these steps (`run_selected_fit.sh`, which runs `run_hmm_pipeline.sbatch` with `SKIP_FIT=1`):
+   1. run4e (already done in the array: skipped);
    2. `tests/check_against_confirmatory.m`;
    3. `python hmm_occupancy_drift.py`;
    4. run4d;
    5. run5;
    6. run5B;
-   7. the Python group analysis, on the `_lowrank` tables and the `hmmmar_simple_k4_hmmpca15` folder.
+   7. the Python group analysis, on the `_lowrank` tables and the `hmmmar_simple_k4_hmmpca15` folder inside `fit_NN/`, restricted by `inference_scope.csv`.
 2. **Results from `hmmmar_simple_k3_pca15` are superseded for the main text.** That includes the graph metrics, the FO and dwell tables, and any figures. They can stay as a Supplement comparison (pre-PCA vs HMM-PCA).
 3. **Supplementary stability results.** The previous bootstrap stability numbers came from the HMM-PCA 50 fit, with Neff ≥ 50 (B-1, B-6). Replace them with the run5B output from the reported fit.
 4. **Confirmatory test: no rerun.** It already tested HMM-PCA 15 and 25, and its results stand as run.

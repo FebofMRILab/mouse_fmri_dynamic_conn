@@ -16,6 +16,10 @@ function results = test_dcc_example_traces(out_dir)
 %   X5  surrogate r of the example equals run_dcc_cpca_null.m's
 %       local_surrogate(X, 'phase', id, r, cfg) (same seeds, same surrogates)
 %   X6  the mouse's pipeline values are read from dfc_subject_metrics.csv
+%   X7  meta_data.csv as Excel writes it (UTF-8 byte-order mark, CRLF) is read:
+%       the example's local_read_meta is the pipeline's, character for character
+% (meta_data.csv here has a byte-order mark and CRLF line endings, as on
+% HiPerGator, so X1-X6 also run on that format)
 
 here = fileparts(mfilename('fullpath'));
 dfc = fileparts(here);
@@ -42,8 +46,9 @@ for s = 1:S
 end
 groups = {'NTG_Y', 'CRND8_Y', 'NTG_Y', 'NTG_M', 'NTG_Y', '5XFAD_Y', 'NTG_A', 'NTG_Y', 'CRND8_M', '5XFAD_M'};
 fid = fopen(fullfile(sig, 'meta_data.csv'), 'w');
-fprintf(fid, 'subject_id,group\n');
-for s = 1:S, fprintf(fid, '%d,%s\n', s, groups{s}); end
+fwrite(fid, uint8([239 187 191]));                    % UTF-8 byte-order mark (Excel CSV UTF-8)
+fprintf(fid, 'subject_id,group\r\n');
+for s = 1:S, fprintf(fid, '%d,%s\r\n', s, groups{s}); end
 fclose(fid);
 dfcdir = fullfile(out_dir, 'dfc_dcc_cpca'); mkdir(dfcdir);
 fid = fopen(fullfile(dfcdir, 'dfc_config.txt'), 'w');
@@ -119,6 +124,15 @@ want = sprintf('dcc_a: observed %.4f, phase-surrogate mean %.4f (SD 0.0060), z %
     info.mouse_id / 100 + 1, info.mouse_id / 100 + 1 - 0.001, 1 + info.mouse_id / 10);
 ok = ~isempty(strfind(txt, want)); %#ok<STREMP>
 res(end + 1, :) = {'X6 pipeline values for the mouse read from dfc_subject_metrics.csv', double(ok), ok};
+
+f_ex = fileread(fullfile(ext, 'local_read_meta.m'));                % pipeline, extracted
+txt_ex = fileread(fullfile(dfc, 'dcc_example_traces.m'));
+i0 = strfind(txt_ex, 'function [sid, grp] = local_read_meta(fn)');
+seg = txt_ex(i0:end);
+i1 = regexp(seg, '\nfunction ', 'once');                % next function
+same = strcmp(strtrim(seg(1:i1)), strtrim(f_ex));
+res(end + 1, :) = {'X7 BOM + CRLF meta_data.csv read; local_read_meta = pipeline''s', double(same), ...
+    same && ~isempty(info.mouse_id)};
 
 results = cell2struct(res, {'check', 'value', 'pass'}, 2);
 fprintf('\n');

@@ -28,6 +28,7 @@ from welch_tests_scipy import welch_t_test
 
 import bct
 from nbs_published import run_nbs
+from brainnet_nodes import load_node_coordinates, write_brainnet_node
 
 warnings.filterwarnings("ignore")
 
@@ -66,6 +67,10 @@ CIRCULAR_DENSITY = 0.15
 
 NBS_T_THRESHOLD = 3.1
 NBS_PERMUTATIONS = 10000
+# NBS components: significant if the Bonferroni-adjusted p (16 one-sided
+# contrasts) is < NBS_ALPHA; shown as trend maps if NBS_ALPHA <= p < NBS_TREND_ALPHA.
+NBS_ALPHA = 0.05
+NBS_TREND_ALPHA = 0.07
 RANDOM_SEED = 20260911
 
 plt.rcParams.update({
@@ -100,6 +105,12 @@ if N_ROI != 82:
     raise ValueError(f"Expected 82 ROIs, but found {N_ROI}.")
 
 print(f"ROI count: {N_ROI}")
+
+# BrainNet Viewer node coordinates (high-resolution CIVM atlas; brainnet_nodes.py).
+# Checked against roi_names_order.csv here, so a mismatch stops the run before
+# the analysis instead of putting spheres on the wrong regions.
+NODE_XYZ, NODE_COORDS_FILE = load_node_coordinates(roi_names)
+print(f"BrainNet node coordinates: {NODE_COORDS_FILE}")
 
 # ============================================================
 # LOAD SUBJECT METADATA
@@ -1309,6 +1320,17 @@ def export_brainnet_edge(matrix, filename):
     print(f"Saved BrainNet edge matrix: {path}")
 
 
+def export_brainnet_node(strength, filename):
+    """
+    Export the BrainNet Viewer .node file that goes with an .edge file:
+    x, y, z (high-resolution CIVM atlas), colour = node strength rounded,
+    size = node strength, label '-' (no label drawn). See brainnet_nodes.py.
+    """
+    path = write_brainnet_node(os.path.join(OUT, filename), strength, NODE_XYZ)
+
+    print(f"Saved BrainNet node file: {path}")
+
+
 # ============================================================
 # CIRCULAR NETWORK PLOTS
 # ============================================================
@@ -1499,6 +1521,12 @@ for group in GROUP_ORDER:
     export_brainnet_edge(
         weighted_group,
         f"BrainNet_{group}_density_{CIRCULAR_DENSITY:.2f}.edge",
+    )
+
+    # Node spheres: strength of the same network (the circular plot's node size).
+    export_brainnet_node(
+        weighted_group.sum(axis=1),
+        f"BrainNet_{group}_density_{CIRCULAR_DENSITY:.2f}.node",
     )
 
     circular_network_plot(
@@ -1751,10 +1779,10 @@ nbs_edges.to_csv(
 
 
 # ============================================================
-# EXPORT SIGNIFICANT NBS COMPONENTS FOR BRAINNET VIEWER
+# EXPORT SIGNIFICANT AND TREND NBS COMPONENTS FOR BRAINNET VIEWER
 # ============================================================
 
-print("\n[NBS] Exporting significant BrainNet edge matrices")
+print("\n[NBS] Exporting significant and trend BrainNet edge matrices")
 
 for group_a, group_b in PAIRWISE_COMPARISONS:
     comparison_name = f"{group_a}_vs_{group_b}"
@@ -1774,6 +1802,7 @@ for group_a, group_b in PAIRWISE_COMPARISONS:
     )
 
     significant_component_count = 0
+    trend_component_count = 0
 
     for component_number, component in enumerate(
         components,
@@ -1781,10 +1810,18 @@ for group_a, group_b in PAIRWISE_COMPARISONS:
     ):
         adjusted_p = component["p_adjusted"]
         
-        if adjusted_p >= 0.05:
+        if adjusted_p >= NBS_TREND_ALPHA:
             continue
 
-        significant_component_count += 1
+        # Trend components (NBS_ALPHA <= p < NBS_TREND_ALPHA) get their own
+        # *_trend files and are not part of the all-significant matrices.
+        is_trend = adjusted_p >= NBS_ALPHA
+        suffix = "_trend" if is_trend else ""
+
+        if is_trend:
+            trend_component_count += 1
+        else:
+            significant_component_count += 1
 
         component_t_matrix = np.zeros(
             (N_ROI, N_ROI),
@@ -1807,6 +1844,9 @@ for group_a, group_b in PAIRWISE_COMPARISONS:
             component_binary_matrix[i, j] = 1
             component_binary_matrix[j, i] = 1
 
+            if is_trend:
+                continue
+
             significant_t_matrix[i, j] = t_value
             significant_t_matrix[j, i] = t_value
 
@@ -1817,7 +1857,7 @@ for group_a, group_b in PAIRWISE_COMPARISONS:
             component_t_matrix,
             (
                 f"NBS_{comparison_name}_component_"
-                f"{component_number}_tstats.edge"
+                f"{component_number}{suffix}_tstats.edge"
             ),
         )
 
@@ -1825,8 +1865,15 @@ for group_a, group_b in PAIRWISE_COMPARISONS:
             component_binary_matrix,
             (
                 f"NBS_{comparison_name}_component_"
-                f"{component_number}_binary.edge"
+                f"{component_number}{suffix}_binary.edge"
             ),
+        )
+
+        # Node spheres: summed |t| of each node's edges in this component
+        # (as Figure 10); nodes outside the component get size 0.
+        export_brainnet_node(
+            np.abs(component_t_matrix).sum(axis=1),
+            f"NBS_{comparison_name}_component_{component_number}{suffix}.node",
         )
 
     if significant_component_count > 0:
@@ -1839,10 +1886,21 @@ for group_a, group_b in PAIRWISE_COMPARISONS:
             significant_binary_matrix,
             f"NBS_{comparison_name}_all_significant_binary.edge",
         )
+
+        export_brainnet_node(
+            np.abs(significant_t_matrix).sum(axis=1),
+            f"NBS_{comparison_name}_all_significant.node",
+        )
     else:
         print(
             f"  {comparison_name}: no component survived "
              "correction across all one-sided NBS contrasts."
+        )
+
+    if trend_component_count > 0:
+        print(
+            f"  {comparison_name}: {trend_component_count} trend component(s) "
+            f"({NBS_ALPHA} <= p < {NBS_TREND_ALPHA}) exported as *_trend files."
         )
 
 
@@ -1874,10 +1932,11 @@ for ax_idx, (group_a, group_b) in enumerate(PAIRWISE_COMPARISONS):
     plot_matrix = np.zeros((N_ROI, N_ROI), dtype=float)
 
     for component in result["components"]:
-        # Display only components significant after Bonferroni across
-        # all 16 one-sided contrasts (8 planned comparisons x 2 directions).
+        # Display components significant after Bonferroni across all 16
+        # one-sided contrasts (8 planned comparisons x 2 directions), p <
+        # NBS_ALPHA, and trend components, NBS_ALPHA <= p < NBS_TREND_ALPHA.
         
-        if component["p_adjusted"] >= 0.05:
+        if component["p_adjusted"] >= NBS_TREND_ALPHA:
             continue
 
         for edge_index in component["edge_indices"]:
@@ -1918,15 +1977,19 @@ for ax_idx, (group_a, group_b) in enumerate(PAIRWISE_COMPARISONS):
         ax=ax,
     )
 
-    significant_components = [
-        component
+    n_significant = sum(
+        component["p_adjusted"] < NBS_ALPHA
         for component in result["components"]
-        if component["p_adjusted"] < 0.05
-    ]
+    )
+    n_trend = sum(
+        NBS_ALPHA <= component["p_adjusted"] < NBS_TREND_ALPHA
+        for component in result["components"]
+    )
 
     ax.set_title(
         f"{group_a} vs {group_b}\n"
-        f"{len(significant_components)} significant component(s)",
+        f"{n_significant} significant (p < {NBS_ALPHA}), "
+        f"{n_trend} trend (p < {NBS_TREND_ALPHA})",
         fontsize=10,
     )
     ax.tick_params(axis="x", rotation=90, labelsize=4.5)
@@ -1937,7 +2000,7 @@ for unused_ax in axes_flat[n_comparisons:]:
     unused_ax.set_visible(False)
     
 fig.suptitle(
-    "Network-Based Statistic: Significant Components",
+    "Network-Based Statistic: Significant and Trend Components",
     fontsize=12,
     fontweight="bold",
 )
@@ -1951,43 +2014,50 @@ save_figure(fig, "figure9_NBS_significant_components.png")
 
 print("\n[Figure 10] NBS circular networks")
 
+NBS_CIRCULAR_SETS = [
+    # (file suffix, label, components included)
+    ("", "significant", lambda p: p < NBS_ALPHA),
+    ("_trend", "trend", lambda p: NBS_ALPHA <= p < NBS_TREND_ALPHA),
+]
+
 for group_a, group_b in PAIRWISE_COMPARISONS:
     result = nbs_results[(group_a, group_b)]
     comparison_name = f"{group_a}_vs_{group_b}"
 
-    nbs_weighted = np.zeros((N_ROI, N_ROI), dtype=float)
+    for suffix, set_label, included in NBS_CIRCULAR_SETS:
+        nbs_weighted = np.zeros((N_ROI, N_ROI), dtype=float)
 
-    for component in result["components"]:
-        if component["p_adjusted"] >= 0.05:
+        for component in result["components"]:
+            if not included(component["p_adjusted"]):
+                continue
+
+            for edge_index in component["edge_indices"]:
+                i = triu_i[edge_index]
+                j = triu_j[edge_index]
+
+                # Absolute t statistics control node strength and edge
+                # width; edge direction remains available in the CSV
+                # and signed BrainNet matrix.
+                weight = abs(result["t"][edge_index])
+
+                nbs_weighted[i, j] = weight
+                nbs_weighted[j, i] = weight
+
+        if np.count_nonzero(nbs_weighted) == 0:
+            print(
+                f"  No NBS circular plot generated for "
+                f"{comparison_name}: no {set_label} component."
+            )
             continue
 
-        for edge_index in component["edge_indices"]:
-            i = triu_i[edge_index]
-            j = triu_j[edge_index]
-
-            # Absolute t statistics control node strength and edge
-            # width; edge direction remains available in the CSV
-            # and signed BrainNet matrix.
-            weight = abs(result["t"][edge_index])
-
-            nbs_weighted[i, j] = weight
-            nbs_weighted[j, i] = weight
-
-    if np.count_nonzero(nbs_weighted) == 0:
-        print(
-            f"  No NBS circular plot generated for "
-            f"{comparison_name}: no significant component."
+        circular_network_plot(
+            weighted=nbs_weighted,
+            #title=f"NBS Network: {group_a} vs {group_b}",
+            filename=(
+                f"figure10_NBS_circular_{comparison_name}{suffix}.png"
+            ),
+            density=NBS_T_THRESHOLD,
         )
-        continue
-
-    circular_network_plot(
-        weighted=nbs_weighted,
-        #title=f"NBS Network: {group_a} vs {group_b}",
-        filename=(
-            f"figure10_NBS_circular_{comparison_name}.png"
-        ),
-        density=NBS_T_THRESHOLD,
-    )
 
 
 # ============================================================
@@ -2027,8 +2097,20 @@ manifest_lines = [
         f"{len(PAIRWISE_COMPARISONS) * 2} contrasts"
     ),
     (
+        f"NBS significant components: Bonferroni p < {NBS_ALPHA}; trend components "
+        f"(figures and *_trend BrainNet files only, not significant): "
+        f"{NBS_ALPHA} <= p < {NBS_TREND_ALPHA}"
+    ),
+    (
         "BrainNet .edge files: tab-delimited numeric matrices "
         "without row or column labels"
+    ),
+    (
+        "BrainNet .node files (one per .edge network): x, y, z from "
+        f"{os.path.basename(NODE_COORDS_FILE)} (high-resolution CIVM atlas), "
+        "colour = node strength rounded, size = node strength (group maps: "
+        "positive weights at the circular-network density; NBS: summed |t|), "
+        "label '-'"
     ),
 ]
 

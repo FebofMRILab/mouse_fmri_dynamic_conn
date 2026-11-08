@@ -29,7 +29,7 @@ test with fresh randomness and a decision rule fixed in advance.
 | Test | one-sided Wilcoxon signed-rank c > 0, Holm across the 6 cells |
 | Decision | state structure only where Holm p < 0.05 **and** the weakest matched state replicates better in observed than in null splits |
 | IAAFT | descriptive only |
-| Drift check | full fits at K = 2–4 on the observed data; each state's occupancy in the 2nd minus the 1st scan half per mouse; two-sided Wilcoxon, Holm across states within K |
+| Drift check | full fits at K = 2–4 on the observed data; each state's occupancy in the 2nd minus the 1st scan half per mouse; two-sided Wilcoxon, Holm across states within K (at K = 2 the two states' changes are each other's negative, so the test is counted once: E50, 27 Oct 2026) |
 
 A cell that passes the test but whose state occupancy drifts between scan
 halves is reported as drift (e.g. sedation), not as recurring states.
@@ -67,9 +67,12 @@ python analyze_confirm_lowrank.py --root hmm_confirm_lowrank
 ```
 
 This writes `hmm_confirm_lowrank/analysis/`:
-- `confirm_cells.csv`
-- `confirm_occupancy_drift.csv`
-- `Fig_confirm_lowrank.{pdf,png}`
+- `confirm_cells.csv`. It holds median c (the statistic of `MODEL_SELECTION_RULE.md` item 6) and its bootstrap CI. Added 27 Oct 2026 (E51), all descriptive:
+  - the Hodges–Lehmann estimate of c with its 95% CI, the interval that inverts the Wilcoxon signed-rank test: exact for n ≤ 50, as `scipy.stats.wilcoxon`, normal approximation above;
+  - its achieved coverage;
+  - the matched-pairs rank-biserial correlation, a scale-free effect size.
+- `confirm_occupancy_drift.csv`. It adds the Hodges–Lehmann change with its 95% CI and a `note` column for the K = 2 one-test rows.
+- `Fig_confirm_lowrank.{pdf,png}`. The forests show the Hodges–Lehmann estimate and 95% CI, labelled unadjusted; filled markers mean Holm p < 0.05. Holm p < 0.05 implies that the CI excludes 0. The earlier bootstrap CI of the median could cross 0 for a filled cell.
 
 It also prints the decision.
 
@@ -79,6 +82,12 @@ It also prints the decision.
 HMM_NULL=iaaft bash submit_confirm_lowrank.sh
 python analyze_confirm_lowrank.py --root hmm_confirm_lowrank --null iaaft
 ```
+
+## Confirming the step 5 screen candidate (27 Oct 2026; `MODEL_SELECTION_RULE.md` item 4, D32)
+
+`run4c_confirm_candidate.m` is a copy of `run4c_confirm_lowrank.m` that differs only in the model and K (from `HMM_CAND_MODEL`, `HMM_CAND_K`), the seeds (20261026, 20261027), the output folder (`hmm_confirm_candidate`) and the PREREGISTRATION text; `diff` the two files to check. `hmm_candidate_options.m` sets the observation model exactly as step 5 does (`gaussian_pca_d` → `options.pca = d`; `lowrank_r` → `options.lowrank = r`; `gaussian_full` → neither). `submit_confirm_candidate.sh` reads the model and K cells from `screen_candidate.txt` (written by `select_screen_candidate.py`), refuses when the selector reports no lead or a candidate covered by step 6, and refuses to reuse an existing `hmm_confirm_candidate/` (E48). 32 chunk tasks (max 15 at once), then 2 finish jobs. Analyse with `python analyze_confirm_lowrank.py --root hmm_confirm_candidate` (Holm across this test's 3 cells).
+
+Tests: `hmm_candidate_options.m` and `hmm_candidate_K.m` 11/11 in Octave 8.4; the submit script with a mock `sbatch` (candidate at K 2-4 and at K 5-7; covered by step 6, no lead, existing folder and IAAFT-before-phase refused; stray `HMM_*` variables removed).
 
 ## Signal rank without any HMM (`mp_signal_rank.py`)
 
@@ -102,6 +111,11 @@ python mp_signal_rank.py --dataset mouse_SE11T hmm_signals 95 2 \
 - Pure noise gave a rank of 0 by both methods.
 - A planted rank of 12 at low SNR was recovered as 10–11; the weakest
   components fall below noise, as they should.
+
+
+### Group level (`mp_signal_rank_group.py`, 15 Oct 2026)
+
+The same two thresholds on the pooled data that the group PCA and HMM-PCA are estimated from (each mouse's standardised series, concatenated; T_eff = sum of the mice's Bartlett T_eff; circular shifts within each mouse). Functions are imported unchanged from `mp_signal_rank.py`. With ~95 × 208 effective samples both thresholds sit near 1, so the script also reports the split-half overlap of the top-k group subspace (two random halves of the mice, stratified by group): how much of the pooled structure is shared across mice rather than specific to some. Outputs: `signal_rank_group/` (CSV per dataset, the spectrum with thresholds and overlap by k, `FigS_signal_rank_group`). Checked on simulated mice with 10 shared directions plus 3 mouse-specific ones each: pooled MP and PA both gave 9, and the split-half overlap stayed above 0.9 up to k = 9 and fell after it.
 
 ## What counts for and against the spin-echo account
 

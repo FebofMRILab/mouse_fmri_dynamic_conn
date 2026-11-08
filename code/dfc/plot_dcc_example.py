@@ -37,7 +37,7 @@ SURR = pdr.NULL_COLORS["phase"]                # the phase null's colour in ever
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[2])
-    ap.add_argument("--in_dir", default=os.path.join("dfc_dcc_cpca_pca15", "dcc_example"))
+    ap.add_argument("--in_dir", default=os.path.join("dfc_dcc_cpca", "dcc_example"))
     ap.add_argument("--formats", nargs="+", default=["pdf", "png"])
     args = ap.parse_args()
     d = args.in_dir

@@ -1,0 +1,16 @@
+DCC cross-check: dfc_dcc_subject.m vs dcc_mvgarch.m (Lindquist DCC toolbox)
+Run 2026-10-04 18:59, 26.1.0.3251617 (R2026a) Update 2
+
+dcc_a        max |diff| 0.0006   median |diff| 0.0002   (n = 6)
+dcc_b        max |diff| 0.0006   median |diff| 0.0001   (n = 6)
+garch_alpha  max |diff| 0.0234   median |diff| 0.0002   (n = 130)
+garch_beta   max |diff| 1.0000   median |diff| 0.0009   (n = 130)
+dcc_a across mice: Pearson r (ours vs published) = 0.998
+
+Simulated (truth a = 0.05, b = 0.90, GARCH alpha = 0.10, beta = 0.80):
+  dcc_a        ours 0.049   published 0.049   (mean over series)
+  dcc_b        ours 0.903   published 0.903   (mean over series)
+  garch_alpha  ours 0.103   published 0.103   (mean over series)
+  garch_beta   ours 0.783   published 0.783   (mean over series)
+
+Read with the known differences in the header (variance targeting, optimiser).

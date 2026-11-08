@@ -46,16 +46,20 @@ close all;
 %% ========== Configuration ==========
 data_dir = 'hmm_signals';
 file_pattern = 'signal%d.txt';
-n_subjects = 95;
-TR_sec = 2;
+n_subjects = local_env_num('HMM_N_SUBJECTS', 95);   % E49: was 58, the human cohort's highest label (E23);
+                                                    % the mouse cohort is 95 (as run4c, hmm_config.m, DFC).
+                                                    % Human data: HMM_N_SUBJECTS=58 HMM_TR=3.
+TR_sec = local_env_num('HMM_TR', 2);   % E49: was 3; the EPI TR is 2 s (Bruker method file, TR 2000 ms; E46),
+                                       % as in run4c and hmm_config.m. With order 0 and no filtering, Fs does not
+                                       % enter the fits; only the final fit's dwell_sec and the printed scan length.
 
 toolbox_dir = '/blue/febo/MATLAB/HMM-MAR-master';
 out_dir = 'hmm_raw_timeseries_null';
 
 % Primary model (set to the null-supported choice from the sensitivity run)
-model_type = 'lowrank';     % 'lowrank' (HMM-PCA) or 'gaussian'
-lowrank_dim = 10;            % used when model_type = 'lowrank'
-pca_dim_primary = 0;        % used when model_type = 'gaussian' (0 = no PCA)
+model_type = 'gaussian';     % 'lowrank' (HMM-PCA) or 'gaussian'
+lowrank_dim = 50;            % used when model_type = 'lowrank'
+pca_dim_primary = 25;        % used when model_type = 'gaussian' (0 = no PCA)
 
 % 1 = covariance (FC) states only (primary analysis).
 % 0 = states also have a mean: activation / co-activation states. Diagnostic

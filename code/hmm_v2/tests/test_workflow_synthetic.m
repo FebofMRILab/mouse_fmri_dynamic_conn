@@ -16,6 +16,10 @@ function results = test_workflow_synthetic(hmmmar_dir, bct_dir, out_dir)
 %   W7  every CSV carries the fit ID in fit_id.txt
 %   W8  hmm_fit_id: known-answer SHA-256 (same value as Python hashlib)
 %   W9  the fit is HMM-PCA (lowrank 5, no pre-PCA) with useParallel = 0
+%   W10 hmm_state_descriptors.m runs on the fit (its pooled FC equals
+%       R.state_fc, checked inside), writes its four files with the fit ID, and
+%       the two simulated states (different factor loadings) differ in pattern:
+%       disattenuated FC pattern r < 0.9
 
 here = fileparts(mfilename('fullpath'));
 v2 = fileparts(here);
@@ -118,6 +122,16 @@ results(end + 1) = struct('check', 'W8 hmm_fit_id known-answer test (SHA-256)', 
 ok = R.hmm.train.lowrank == 5 && R.hmm.train.pca == 0 && R.options.useParallel == 0;
 results(end + 1) = struct('check', 'W9 fit is HMM-PCA (lowrank 5, pca 0), useParallel 0', 'value', NaN, ...
     'pass', ok);
+
+run_script(fullfile(v2, 'hmm_state_descriptors.m'));
+dd = fullfile(work, 'signals', 'hmmmar_simple_k2_hmmpca5', 'state_descriptors');
+fs = {'state_descriptors_per_mouse.csv', 'state_descriptors_pooled.csv', 'state_pairs.csv', ...
+    'state_descriptors_report.txt'};
+n_ok = sum(cellfun(@(f) exist(fullfile(dd, f), 'file') == 2, fs));
+Pd = readtable(fullfile(dd, 'state_pairs.csv'), 'TextType', 'string');
+results(end + 1) = struct('check', 'W10 state descriptors written, fit ID, patterns differ (disattenuated r)', ...
+    'value', Pd.fc_pattern_r_disattenuated(1), 'pass', n_ok == 4 ...
+    && strcmp(Pd.fit_id(1), R.fit_id) && Pd.fc_pattern_r_disattenuated(1) < 0.9);
 
 Tres = struct2table(results);
 disp(Tres);

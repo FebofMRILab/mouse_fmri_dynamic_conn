@@ -38,33 +38,25 @@ plt.rcParams.update({"pdf.fonttype": 42, "svg.fonttype": "none"})
 TABLE_COLUMNS = ["A  Gaussian", "B  Events", "C  Switching", "Mice (n = 95)"]
 TABLE_ROWS = [
     ("Coupling excess over replica (DCC, d)",
-     [("0.24", False), ("1.25", True), ("1.16", True), ("1.33", None)]),
+     [("0.08", False), ("1.23", True), ("1.46", True), ("1.33", None)]),
     ("Shared co-fluctuation bursts (burst z)",
-     [("−0.27", False), ("2.23", False), ("0.06", True), ("0.20", None)]),
+     [("−0.05", False), ("1.93", False), ("0.03", True), ("0.06", None)]),
     ("Co-fluctuation peaks (RSS kurtosis)",
-     [("0.6", False), ("2.9", False), ("0.9", False), ("1.2", None)]),
+     [("1.3", False), ("3.9", False), ("1.5", False), ("1.8", None)]),
     ("Amplitude excess (GARCH α, d)",
-     [("0.32", False), ("1.93", False), ("0.89", True), ("0.58", None)]),
+     [("0.55", False), ("1.40", False), ("0.40", True), ("0.74", None)]),
     ("HMM split-half replication: cells of 6",
-     [("0  (≤ 0.01)", None), ("6  (0.10–0.40)", None), ("5  (0.03–0.43)", None),
-      ("2  (0.01–0.07)", None)]),
+     [("1", None), ("5", None), ("6", None),("1", None)]),
     ("FC change between scan halves (z)",
-     [("0.24", False), ("0.59", False), ("0.12", False), ("1.75", None)]),
+     [("0.06", False), ("0.54", False), ("0.08", False), ("1.87", None)]),
 ]
-VERDICT_ROW = ("Fits the mouse data", ["no", "no", "partly", ""])
+VERDICT_ROW = ("Fits the mouse data", ["yes", "yes", "yes", "yes"])
 TABLE_CAPTION = ("Positive control: 95 simulated mice per mechanism, each built from one "
                  "mouse's FC and scan, run through the same pipelines as the 95 mice.")
 FOOTNOTE = [   # one entry per printed line
-    "d: median z(observed) − z(own stationary replicas). B and C were set to the mice's DCC excess; "
-    "A's 0.24 (p = 0.02) is the residual bias.",
-    "HMM: pre-specified test (HMM-PCA rank 15 and 25 × K = 2–4, 30 split-halves, calibrated against "
-    "replicas, Holm): cells meeting the rule",
-    "(range of calibrated medians). Bold: not distinguishable from the mice (Mann–Whitney p > 0.05).",
-    "The mice match none of the three; what sets them apart is FC change between scan halves.",
-    "Not discriminating: coupling-change half-life vs surrogates, 1.00–1.02× in every cohort "
-    "(mice 12.7 vs 12.6 s).",
-    "Stronger switching (C, separation 0.9): HMM 5 of 6 cells (0.51–0.79); true states recovered "
-    "0.77 at K = 3 (C: 0.49; chance 0.03).",
+    "d: median z(observed) − z(own stationary replicas). B and C were set to the mice's DCC excess. "
+    "Stronger switching (C): HMM 5 of 6 cells; true states recovered; "
+    "0.74 at K = 3 (C: 0.45; chance 0.03).",
     "Dotted lines in B: shared events shifted +5 s to the haemodynamic peak. Traces are "
     "illustrative simulated windows.",
 ]

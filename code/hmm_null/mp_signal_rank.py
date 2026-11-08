@@ -201,13 +201,13 @@ def main():
                 Line2D([], [], color=SECONDARY, lw=0.7, ls=":", label="Marchenko–Pastur edge")]
     ax.legend(handles=handles, frameon=False, fontsize=6,
               loc="lower left" if args.spectrum_scale == "log" else "upper right")
-    ax.set_title("Median eigenvalue spectrum", fontsize=8, loc="left")
+    ax.set_title("", fontsize=8, loc="left")
     sns.despine(ax=ax)
 
     for ax, col, ylab, title in [
-            (axes[1], ["rank_pa", "rank_mp"], "Signal dimensions", "Signal rank per subject"),
+            (axes[1], ["rank_pa", "rank_mp"], "Signal dimensions", ""),
             (axes[2], ["var_signal_pa", "var_signal_mp"], "Variance above noise (share)",
-             "Signal variance share")]:
+             "")]:
         pos = 0
         ticks, ticklabels = [], []
         for i, lab in enumerate(labels):

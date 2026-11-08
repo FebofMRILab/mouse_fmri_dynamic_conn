@@ -20,9 +20,18 @@ as the static-FC, graph-metric and nodal analyses:
                    per outcome
 
 Model and inputs (hmm_model_selection.py, same settings as hmm_config.m):
-  the reported fit, HMM-PCA rank 15, K = 4, from run4d's tables
-  <HMM_OUT_BASE>/hmm_{switching_rates,maxFO,dwell_times}_all_K_all_lowrank.csv;
+  the chosen fit of one reported model (primary: Gaussian HMM on 25 PCs, K = 3;
+  secondary: HMM-PCA rank 15, K = 2; hmm_v2/MODEL_*.env), from run4d's tables
+  <HMM_OUT_BASE>/hmm_{switching_rates,maxFO,dwell_times}_all_K_all_{PCA,lowrank}.csv;
   every table must carry the same fit ID as <model folder>/fit_id.txt.
+
+What is tested (hmm_v2/FIT_SELECTION_RULE.md; hmm_model_selection.inference_scope)
+  only the states that recur across independent fits, and switching rate and
+  max FO only if they agree across fits; the Holm and BH families contain only
+  those. Descriptive tables cover every state.
+  K = 2: FO of state 2 is 1 - FO of state 1, so occupancy is tested once
+  (state 1), shown for both states (column same_test_as) and counted once in
+  the Holm and BH families (FIT_SELECTION_RULE.md amendment 1; E50).
 
 Outcomes
   switching rate, maximum FO         one value per subject
@@ -256,11 +265,15 @@ def median_range_table(frame, by=("state",), decimals=1):
     
 # ---------------- main ----------------
 def main():
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
     switching = load("switching_rates")
     maxfo = load("maxFO")
     states = load("dwell_times")
     state_order = sorted(states["state"].unique())
+    scope = sel.inference_scope()
+    test_order = sel.tested_states(state_order, scope)
+    sel.fresh_output_dir(OUT_DIR, ["*.csv", "inference_scope_used.txt"])
+    (OUT_DIR / "inference_scope_used.txt").write_text(scope["source"] + "\n")
+    print(scope["source"])
 
     summary_state, summary_state_numeric = median_range_table(states, by=("state",))
  
@@ -282,10 +295,15 @@ def main():
     print(switching.groupby("group").size().reindex(GROUP_ORDER).to_string())
 
     omnibus_rows, planned_rows = [], []
+    if not test_order and not scope["switching_rate"] and not scope["max_FO"]:
+        print("Nothing to test under the fit-selection rule; descriptive tables only.")
+        return
 
-    # subject-level outcomes
+    # subject-level outcomes (only those the fit-selection rule allows)
     for outcome, frame, column in [("switching_rate", switching, "switching_rate"),
                                    ("max_FO", maxfo, "max_FO")]:
+        if not scope[outcome]:
+            continue
         F, p = omnibus(frame, column)
         samples = samples_by_group(frame, column)
         df1, df2 = welch_df(samples) if testable(samples) else (np.nan, np.nan)
@@ -304,25 +322,47 @@ def main():
         ("dwell_time_log10", dwell_frame, "mean_dwell_seconds", np.log10, "Welch ANOVA on log10"),
     ]
     for outcome, frame, column, transform, test in per_state:
+        # K = 2: FO of one state is 1 - FO of the other, so its test is run and
+        # counted once (sel.fo_test_plan; FIT_SELECTION_RULE.md amendment 1, E50)
+        plan = (sel.fo_test_plan(test_order, SELECTED_K, states)
+                if outcome == "fractional_occupancy" else {s: s for s in test_order})
         block = []
-        for state in state_order:
+        for state in test_order:
+            if plan[state] != state:
+                continue
             sub = frame[frame["state"] == state]
             F, p = omnibus(sub, column, transform)
             samples = samples_by_group(sub, column, transform)
             df1, df2 = welch_df(samples) if testable(samples) else (np.nan, np.nan)
             block.append({"outcome": outcome, "state": state, "test": test,
                           "statistic": F, "df1": df1, "df2_Welch": df2,
-                          "p_permutation": p})
+                          "p_permutation": p, "same_test_as": ""})
             for row in planned(sub, column, transform):
-                planned_rows.append({"outcome": outcome, "state": state, **row})
+                planned_rows.append({"outcome": outcome, "state": state, "same_test_as": "", **row})
         adjusted = holm([r["p_permutation"] for r in block])
         for r, a in zip(block, adjusted):
             r["p_Holm"] = a
+        tested = {r["state"]: r for r in block}
+        for state in test_order:
+            source = plan[state]
+            if source == state:
+                continue
+            # the same test: copy it (shown for this state, not counted again)
+            block.append({**tested[source], "state": state, "same_test_as": str(source)})
+            sub = frame[frame["state"] == state]
+            src_rows = {r["comparison"]: r for r in planned_rows
+                        if r["outcome"] == outcome and r["state"] == source}
+            for row in planned(sub, column, transform):
+                # this state's own group means and t (sign reversed); p is the source's
+                row["p_welch"] = src_rows[row["comparison"]]["p_welch"]
+                planned_rows.append({"outcome": outcome, "state": state,
+                                     "same_test_as": str(source), **row})
+        block.sort(key=lambda r: test_order.index(r["state"]))
         omnibus_rows.extend(block)
 
     # presence
     block, presence_rows = [], []
-    for state in state_order:
+    for state in test_order:
         sub = states[states["state"] == state]
         chi2, p = presence_test(sub)
         block.append({"outcome": "state_presence", "state": state,
@@ -337,19 +377,38 @@ def main():
     omnibus_rows.extend(block)
 
     omnibus_table = pd.DataFrame(omnibus_rows)
-    planned_table = pd.DataFrame(planned_rows)
+    if "same_test_as" not in omnibus_table:
+        omnibus_table["same_test_as"] = ""
+    omnibus_table["same_test_as"] = omnibus_table["same_test_as"].fillna("")
+    planned_table = pd.DataFrame(planned_rows, columns=None if planned_rows else
+                                 ["outcome", "state", "same_test_as", "comparison", "n_a", "n_b",
+                                  "mean_a", "mean_b", "t", "df_Welch", "p_welch"])
+    if "same_test_as" not in planned_table:
+        planned_table["same_test_as"] = ""
+    planned_table["same_test_as"] = planned_table["same_test_as"].fillna("")
+    # BH pooled per outcome over the tests counted once; a row that repeats
+    # another state's test (K = 2 occupancy) takes that test's q
     planned_table["q_BH_pooled"] = np.nan
-    for outcome, idx in planned_table.groupby("outcome").groups.items():
+    own = planned_table["same_test_as"] == ""
+    for outcome, idx in planned_table[own].groupby("outcome").groups.items():
         planned_table.loc[idx, "q_BH_pooled"] = bh(planned_table.loc[idx, "p_welch"])
+    for i in planned_table.index[~own]:
+        r = planned_table.loc[i]
+        src = planned_table[own & (planned_table["outcome"] == r["outcome"])
+                            & (planned_table["state"].astype(str) == r["same_test_as"])
+                            & (planned_table["comparison"] == r["comparison"])]
+        planned_table.loc[i, "q_BH_pooled"] = src["q_BH_pooled"].iloc[0]
 
     # state comparisons within each group (paired, BH pooled per outcome)
     state_rows = []
     for outcome, frame, column, transform in [
             ("fractional_occupancy", states, "fractional_occupancy", None),
             ("dwell_time_log10", dwell_frame, "mean_dwell_seconds", np.log10)]:
-        for row in state_comparisons(frame, column, state_order, transform):
+        for row in state_comparisons(frame, column, test_order, transform):
             state_rows.append({"outcome": outcome, **row})
-    state_table = pd.DataFrame(state_rows)
+    state_table = pd.DataFrame(state_rows, columns=None if state_rows else
+                               ["outcome", "group", "comparison", "n_paired_animals", "mean_a",
+                                "mean_b", "mean_difference", "t_paired", "p_permutation"])
     state_table["q_BH_pooled"] = np.nan
     for outcome, idx in state_table.groupby("outcome").groups.items():
         state_table.loc[idx, "q_BH_pooled"] = bh(state_table.loc[idx, "p_permutation"])
@@ -364,9 +423,9 @@ def main():
 
     print("\nOmnibus tests:")
     print(omnibus_table.round(4).to_string(index=False))
-    sig = planned_table[planned_table["q_BH_pooled"] < 0.05]
+    sig = planned_table[(planned_table["q_BH_pooled"] < 0.05) & own]
     print(f"\nPlanned contrasts surviving pooled BH: {len(sig)} of "
-          f"{planned_table['p_welch'].notna().sum()} testable")
+          f"{planned_table.loc[own, 'p_welch'].notna().sum()} testable (each test counted once)")
     if len(sig):
         print(sig[["outcome", "state", "comparison", "t", "df_Welch", "p_welch", "q_BH_pooled"]]
               .round(4).to_string(index=False))

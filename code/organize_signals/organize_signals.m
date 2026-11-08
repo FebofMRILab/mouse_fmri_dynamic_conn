@@ -4,6 +4,16 @@
 %                    <project>/signals
 %
 % On the cluster, load FSL before starting MATLAB.
+%
+% 24 Oct 2026 edits, marked "EDIT" (provenance E47):
+%   1. fslmeants without --eig: the ROI MEAN over mask voxels, which is the
+%      time series RABIES's FC matrices are computed from. --eig gave the
+%      first eigenvariate (FSL fslmeants.cc: first eigenvector of the
+%      voxel-demeaned time x time covariance), which differs from the mean.
+%   2. Output to signals/hmm_signals_mean and roi_signals_mean, so the
+%      --eig files are kept; meta_data.csv is read from hmm_signals.
+%   3. Check at the end: corrcoef of each mouse's signals vs its RABIES
+%      FC matrix (analysis_outputs/.../matrix_data_file); expected < 1e-4.
 
 clear; clc;
 
@@ -18,8 +28,10 @@ projectDir = fileparts(codeDir);
 cleanedDir = fullfile(projectDir, 'confound_correction_outputs', ...
     'confound_correction_datasink', 'cleaned_timeseries');
 signalsDir = fullfile(projectDir, 'signals');
-hmmDir = fullfile(signalsDir, 'hmm_signals');
-metaFile = fullfile(hmmDir, 'meta_data.csv');
+hmmDir = fullfile(signalsDir, 'hmm_signals_mean');                % EDIT 2
+metaFile = fullfile(signalsDir, 'hmm_signals', 'meta_data.csv');  % EDIT 2
+fcRoot = fullfile(projectDir, 'analysis_outputs', ...              % EDIT 3
+    'commonspace_analysis_datasink', 'matrix_data_file');
 
 %% Check dependencies and metadata before extracting anything
 if ~isfile(atlasFile)
@@ -40,6 +52,7 @@ if ~isfolder(hmmDir), mkdir(hmmDir); end
 if ~isfile(metaFile)
     error('Required metadata file not found: %s', metaFile);
 end
+copyfile(metaFile, fullfile(hmmDir, 'meta_data.csv'));             % EDIT 2
 
 meta = readtable(metaFile, 'TextType', 'string');
 if ~all(ismember({'subject_id', 'group'}, meta.Properties.VariableNames))
@@ -121,7 +134,7 @@ signalFiles = strings(nSubjects, 1);
 
 for k = 1:nSubjects
     folderName = subjectDirs(k).name;
-    roiDir = fullfile(signalsDir, folderName, 'roi_signals');
+    roiDir = fullfile(signalsDir, folderName, 'roi_signals_mean');  % EDIT 2
     if ~isfolder(roiDir), mkdir(roiDir); end
 
     info = niftiinfo(imageFiles{k});
@@ -136,7 +149,7 @@ for k = 1:nSubjects
 
     for roi = 1:numRoi
         roiFile = fullfile(roiDir, sprintf('roi%d.txt', roi));
-        cmd = sprintf('fslmeants -i %s --eig -o %s -m %s', ...
+        cmd = sprintf('fslmeants -i %s -o %s -m %s', ...   % EDIT 1: mean (was --eig)
             shellQuote(imageFiles{k}), shellQuote(roiFile), ...
             shellQuote(maskFiles{roi}));
         runCommand(cmd, sprintf('Subject %d, ROI %d', subjectIds(k), roi));
@@ -212,6 +225,29 @@ save(fullfile(hmmDir, 'raw_timeseries_aligned.mat'), ...
 
 fprintf('Complete: aligned %d/%d metadata subjects; %d ROIs each.\n', ...
     height(aligned_tbl), nMeta, numRoi);
+
+%% EDIT 3: check each mouse against its RABIES FC matrix
+% RABIES writes matrix_data_file/<same _split_name_ folder>/<prefix>_FC_matrix.csv;
+% the last numRoi x numRoi block is read so a header row/column is skipped.
+iu = triu(true(numRoi), 1);
+maxDiff = nan(nSubjects, 1);
+for k = 1:nSubjects
+    hits = dir(fullfile(fcRoot, subjectDirs(k).name, '*FC_matrix.csv'));
+    if numel(hits) ~= 1
+        warning('Subject %d: %d FC matrix files found; not checked.', ...
+            subjectIds(k), numel(hits));
+        continue;
+    end
+    F = readmatrix(fullfile(hits(1).folder, hits(1).name));
+    F = F(end-numRoi+1:end, end-numRoi+1:end);
+    D = abs(corrcoef(matrices{k}) - F);
+    maxDiff(k) = max(D(iu));
+end
+fcCheck = table(subjectIds, maxDiff, maxDiff < 1e-4, ...
+    'VariableNames', {'subject_id', 'fc_max_abs_diff', 'matches_rabies_fc'});
+writetable(fcCheck, fullfile(hmmDir, 'fc_check.csv'));
+fprintf('FC check: %d of %d subjects checked; largest |corr(signals) - RABIES FC| = %.2e; %d above 1e-4.\n', ...
+    sum(isfinite(maxDiff)), nSubjects, max(maxDiff), sum(maxDiff >= 1e-4));
 
 %% Local helpers
 function runCommand(command, description)

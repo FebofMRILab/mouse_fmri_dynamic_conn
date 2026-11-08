@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+# Test stand-in for ANTs antsApplyTransforms (CLI subset: -d -i -r -o -n -t),
+# implemented with antspyx (the same ANTs library and transform-list order).
+import sys, tempfile, ants
+a = sys.argv[1:]
+inp = ref = out = None; interp = "linear"; tl = []
+i = 0
+while i < len(a):
+    k, v = a[i], a[i + 1] if i + 1 < len(a) else None
+    if k == "-i": inp = v
+    elif k == "-r": ref = v
+    elif k == "-o": out = v
+    elif k == "-n": interp = {"GenericLabel": "genericLabel", "NearestNeighbor": "nearestNeighbor",
+                              "Linear": "linear"}.get(v, v)
+    elif k == "-t": tl.append(v)
+    i += 2
+img, fx = ants.image_read(inp), ants.image_read(ref)
+tl = [t for t in tl if t != "identity"]
+if not tl:
+    f = tempfile.NamedTemporaryFile(suffix=".mat", delete=False).name
+    ants.write_transform(ants.create_ants_transform(transform_type="AffineTransform", dimension=3), f)
+    tl = [f]
+w = ants.apply_transforms(fixed=fx, moving=img, transformlist=tl, interpolator=interp,
+                          imagetype=3 if img.dimension == 4 else 0)
+ants.image_write(w, out)

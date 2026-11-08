@@ -1,7 +1,9 @@
 #!/bin/bash
-# HMM pipeline for the reported model (hmm_config.m: HMM-PCA, lowrank 15, K 4):
-#   run4e (fit) -> comparison with the confirmatory full fit -> drift test
-#   -> run4d (tables) -> run5 (graph metrics) -> run5B (bootstrap stability)
+# HMM pipeline for one model (hmm_config.m: the model in HMM_K / HMM_LOWRANK /
+# HMM_PCA, else hmm_v2/MODEL_PRIMARY.env):
+#   run4e (fit) -> comparison with the confirmation's full fit -> drift test
+#   -> run4d (tables) -> run5 (graph metrics) -> state descriptors (amplitude vs
+#   correlation pattern; descriptive) -> run5B (bootstrap stability)
 #   -> the Python statistics and figures in hmm_py/, if that folder is present
 # One core, 8 GB; the fit takes about 1-3 h and run5B about 1 h.
 #
@@ -35,7 +37,7 @@ M="matlab -nodisplay -nosplash -singleCompThread -batch"
 SIGNALS=${HMM_OUT_BASE:-/blue/febo/share/Abeta_Age/rabies/signals}
 DATA=${HMM_DATA_DIR:-$SIGNALS/hmm_signals}
 [[ -d "$DATA" ]] || { echo "No signal folder $DATA (set HMM_OUT_BASE or HMM_DATA_DIR)"; exit 1; }
-echo "Start $(date); outputs: $SIGNALS; signals: $DATA; K = ${HMM_K:-4 (default)}; BCT: ${HMM_BCT:-not found}"
+echo "Start $(date); outputs: $SIGNALS; signals: $DATA; K = ${HMM_K:-(MODEL_PRIMARY.env)}, lowrank ${HMM_LOWRANK:-(MODEL_PRIMARY.env)}, pca ${HMM_PCA:-(MODEL_PRIMARY.env)}; BCT: ${HMM_BCT:-not found}"
 
 module purge
 module load matlab
@@ -56,6 +58,7 @@ module purge
 module load matlab
 $M "addpath('hmm_v2'); run4d_hmm_mar_plots_analysis; quit force" || echo "run4d failed (see above)."
 $M "addpath('hmm_v2'); run5_analyze_raw_hmm_graph_metrics; quit force" || { echo "run5 failed; stop."; exit 1; }
+$M "addpath('hmm_v2'); hmm_state_descriptors; quit force" || echo "State descriptors failed (see above)."
 $M "addpath('hmm_v2'); run5B_hmm_block_bootstrap_stability; quit force" || echo "run5B failed (see above)."
 if [[ -d hmm_py ]]; then                 # Python statistics and figures, same fit
     module purge

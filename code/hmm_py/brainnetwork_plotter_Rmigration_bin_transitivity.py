@@ -15,7 +15,8 @@ Input
 -----
 graph_metrics_per_subject_per_state_density15.csv of the reported fit (run5):
 <model folder>/hmm_raw_posthoc_graph_metrics/, model folder from
-hmm_model_selection.py (same settings as hmm_config.m: HMM-PCA rank 15, K 3).
+hmm_model_selection.py (same settings as hmm_config.m: the primary or secondary
+reported model, hmm_v2/MODEL_*.env).
 A path given as the first argument is used instead. The file must carry the
 fit ID in <model folder>/fit_id.txt.
 
@@ -555,6 +556,9 @@ if not INPUT_FILE.exists():
 
 data = pd.read_csv(INPUT_FILE)
 FIT_ID = sel.check_fit_id(data, INPUT_FILE.name) or "not recorded"
+SCOPE = sel.inference_scope()
+sel.fresh_output_dir(OUTPUT_DIR, ["*.csv", "*.png", "*.pdf", "*.tif", "*.tiff", "*.svg",
+                                  "figure_generation_manifest.txt"])
 print(f"{sel.LABEL}; fit {FIT_ID[:12]}")
 
 required_columns = {
@@ -678,6 +682,24 @@ for metric, settings in METRICS.items():
 
 
 # ============================================================
+# WHAT IS TESTED (hmm_v2/FIT_SELECTION_RULE.md)
+# Tests and figures only for states that recur across independent fits, so the
+# Holm and BH families hold only those; the summaries above keep every state.
+# ============================================================
+
+print(SCOPE["source"])
+state_order = sel.tested_states(state_order, SCOPE)
+data = data.loc[data["state"].isin(state_order)].copy()
+data["state"] = data["state"].cat.set_categories(state_order, ordered=True)
+if not state_order:
+    (OUTPUT_DIR / "figure_generation_manifest.txt").write_text(
+        f"Fit ID: {FIT_ID}\n{SCOPE['source']}\nNo recurring state: no group tests or "
+        "figures (FIT_SELECTION_RULE.md, item 9).\n", encoding="utf-8")
+    print("No recurring state: no group tests or figures.")
+    sys.exit(0)
+
+
+# ============================================================
 # GROUP TESTS (Welch ANOVA, Holm across states x metrics)
 # ============================================================
 
@@ -774,7 +796,11 @@ for metric in METRICS:
                 "t_paired": t_value, "p_permutation": p_value,
             })
 
-state_posthoc = pd.DataFrame(state_rows)
+# One tested state (e.g. K = 2 with one recurring state) gives no state pairs:
+# keep the columns so the empty table is written instead of failing (E52).
+state_posthoc = pd.DataFrame(state_rows, columns=None if state_rows else [
+    "metric", "group", "comparison", "n_paired_animals", "mean_a", "mean_b",
+    "mean_difference", "t_paired", "p_permutation"])
 state_posthoc["q_BH_pooled"] = np.nan
 for metric, index in state_posthoc.groupby("metric").groups.items():
     state_posthoc.loc[index, "q_BH_pooled"] = bh(state_posthoc.loc[index, "p_permutation"])
@@ -870,7 +896,8 @@ manifest = [
     f"Fit ID: {FIT_ID}",
     f"Number of observations: {len(data)}",
     f"Number of unique subjects: {data['subject_id'].nunique()}",
-    f"States: {', '.join(map(str, state_order))}",
+    f"States tested and shown: {', '.join(map(str, state_order))}",
+    f"Scope: {SCOPE['source']}",
     f"Group order: {', '.join(GROUP_ORDER)}",
     f"Font family used: {FONT_FAMILY}",
     f"PNG resolution: {PNG_DPI} dpi",

@@ -4,7 +4,10 @@
 # refit), (3) whether the previous run4e outputs come from one fit or two,
 # (4) the updated run4e -> run4d -> run5 -> run5B chain on simulated data,
 # (4b, 4c) the fit-selection rule on simulated fits and on eight real run4e fits
-# of the simulated cohort, (5) the drift script (Python) on that simulated fit.
+# of the simulated cohort, (4d) the state descriptors on simulated states with a
+# known answer, (5) the drift script (Python) on that simulated fit, (6) the
+# Hodges-Lehmann intervals and K = 2 drift fix of the confirmation analysis,
+# (7) the job scripts reading the two reported models from their files.
 # One core; about 1.5 h.
 # Step 5 uses the Python environment from setup_python_env.sh.
 #
@@ -27,8 +30,11 @@ cd "$SLURM_SUBMIT_DIR"
 unset DISPLAY      # no X11 in batch jobs (silences "Invalid MIT-MAGIC-COOKIE-1 key")
 
 # ---- inputs: the existing (previous) mouse fit, K = 3 pre-PCA 15, no refit.
-# These tests compare previous and updated code on the same fit, so they use
-# the fit that already exists, not the reported model. Data folder as in hmm_config.m.
+# Steps 2 and 3 compare previous and updated code on that fit, so they need it;
+# they passed on 4 Oct 2026. If the fit is no longer there (eigenvariate-era
+# folders renamed or removed), steps 2 and 3 are skipped and every other step
+# runs: they need only HMM-MAR, BCT and the simulated data they make.
+# Data folder as in hmm_config.m.
 SIGNALS=${HMM_OUT_BASE:-/blue/febo/share/Abeta_Age/rabies/signals}
 HMM_RESULTS=${HMM_RESULTS:-$SIGNALS/hmmmar_simple_k3_pca15/raw_hmm_results.mat}
 HMM_SIGNALS=${HMM_SIGNALS:-$SIGNALS/hmm_signals}
@@ -39,12 +45,19 @@ if [[ -z "${BCT_DIR:-}" ]]; then        # find the folder holding BCT's threshol
 fi
 OUT=$PWD/hmm_v2_test_results
 
-for p in "$HMM_RESULTS" "$HMM_SIGNALS" "$HMMMAR_DIR" "${BCT_DIR:-missing}" hmm_v2/tests; do
+for p in "$HMMMAR_DIR" "${BCT_DIR:-missing}" hmm_v2/tests; do
     [[ -e "$p" ]] || { echo "Not found: $p  (set it with --export=ALL,NAME=path)"; exit 1; }
 done
+REAL_FIT=1
+if [[ ! -e "$HMM_RESULTS" || ! -e "$HMM_SIGNALS" ]]; then
+    REAL_FIT=0
+    echo "Previous mouse fit or its signals not found ($HMM_RESULTS, $HMM_SIGNALS):"
+    echo "steps 2 and 3 (previous vs updated code on that fit; passed 4 Oct 2026) are skipped."
+    echo "To run them, give the fit with --export=ALL,HMM_RESULTS=<path>/raw_hmm_results.mat"
+fi
 mkdir -p "$OUT"
 echo "Start $(date)"
-echo "Fit: $HMM_RESULTS"; echo "Signals: $HMM_SIGNALS"
+echo "Fit: $HMM_RESULTS (used: $REAL_FIT)"; echo "Signals: $HMM_SIGNALS"
 echo "HMM-MAR: $HMMMAR_DIR"; echo "BCT: $BCT_DIR"; echo "Results: $OUT"
 
 module purge
@@ -62,6 +75,7 @@ matlab -nodisplay -nosplash -singleCompThread -batch "cd('hmm_v2/tests'); \
     writetable(struct2table(r), '$OUT/run5B_helper_tests.csv'); quit force" \
     || echo "run5B helper tests stopped with an error (see above)."
 
+if [[ $REAL_FIT == 1 ]]; then
 echo "== 2. Previous vs updated code on the existing mouse fit"
 matlab -nodisplay -nosplash -singleCompThread -batch "cd('hmm_v2/tests'); \
     test_hmm_v2_real_data('$HMM_RESULTS', '$HMM_SIGNALS', '$OUT/real_data', \
@@ -73,6 +87,9 @@ MODEL_DIR=$(dirname "$HMM_RESULTS")
 matlab -nodisplay -nosplash -singleCompThread -batch "cd('hmm_v2/tests'); \
     check_fit_consistency('$MODEL_DIR', '$OUT/fit_consistency', '$HMMMAR_DIR'); quit force" \
     || echo "Fit-consistency check stopped with an error (see above)."
+else
+echo "== 2-3. Skipped (no previous mouse fit; see above)"
+fi
 
 echo "== 4. Updated run4e -> run4d -> run5 -> run5B on a simulated cohort"
 matlab -nodisplay -nosplash -singleCompThread -batch "cd('hmm_v2/tests'); \
@@ -91,6 +108,12 @@ matlab -nodisplay -nosplash -singleCompThread -batch "cd('hmm_v2/tests'); \
     writetable(struct2table(r), '$OUT/select_on_run4e_tests.csv'); quit force" \
     || echo "Selection on run4e outputs stopped with an error (see above)."
 
+echo "== 4d. State descriptors (amplitude vs correlation pattern) on simulated states with a known answer"
+matlab -nodisplay -nosplash -singleCompThread -batch "cd('hmm_v2/tests'); \
+    r = test_state_descriptors('$HMMMAR_DIR'); \
+    writetable(struct2table(r), '$OUT/state_descriptor_tests.csv'); quit force" \
+    || echo "State-descriptor test stopped with an error (see above)."
+
 echo "== 5. Drift test (Python): equivalence with the confirmatory code, then on the simulated fit"
 ENV=${ENV:-/blue/febo/$USER/envs/fc_static}
 module purge
@@ -99,5 +122,11 @@ PY="conda run --no-capture-output -p $ENV python"
 (cd hmm_v2 && $PY tests/test_occupancy_drift.py) 2>&1 | tee "$OUT/occupancy_drift_test.txt"
 $PY hmm_v2/hmm_occupancy_drift.py --model_dir "$OUT/workflow/work/signals/hmmmar_simple_k2_hmmpca5" \
     2>&1 | tee "$OUT/occupancy_drift_workflow.txt"
+
+echo "== 6. Confirmation analysis: Hodges-Lehmann CI, rank-biserial, K = 2 drift counted once"
+(cd hmm_null && $PY tests/hodges_lehmann/test_hodges_lehmann.py) 2>&1 | tee "$OUT/hodges_lehmann_test.txt"
+
+echo "== 7. Job scripts read the primary and secondary models from their files (stubs, no fitting)"
+bash hipergator_tests/tests/test_model_files.sh 2>&1 | tee "$OUT/model_files_test.txt"
 
 echo "End $(date). Send back the folder $OUT and this log."

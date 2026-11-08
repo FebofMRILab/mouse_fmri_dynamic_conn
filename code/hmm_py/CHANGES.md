@@ -17,6 +17,13 @@ All of these are reached through `welch_tests_scipy.py`, the same module (byte-i
 | P2 | No link between a table and its fit | Every table must carry one fit ID, equal to `fit_id.txt`. The ID is written into every output table and manifest. | S7: tables from another fit are refused by all three scripts that read run4d/run5 tables |
 | P3 | `HMM_DATA_DIR` named the tables folder (`hmm_dynamic_stats.py`). In `hmm_config.m` the same name is the signal-file folder. | `HMM_OUT_BASE`, as in `hmm_config.m` | One meaning per variable. Its default is `/blue/febo/share/Abeta_Age/rabies/signals`, as in `hmm_config.m`. |
 | P4 | Output folders: `R_hmm_analysis_pca50_k3_python`, `hmm_dynamics_stats_hmmpca50_k3`, `hmm_graph_figures` in the working folder, and `bootstrap_supplement` in the working folder | `<HMM_OUT_BASE>/hmm_dynamics_figures_hmmpca15_k4`, `<HMM_OUT_BASE>/hmm_dynamics_stats_hmmpca15_k4`, `<model folder>/hmm_graph_figures`, `<model folder>/bootstrap_supplement` | Outputs sit with the fit they describe |
+| P5 | Every state and both whole-fit outcomes tested | What is tested comes from `<model folder>/inference_scope.csv`, written by `hmm_v2/select_reported_fit.m` under the pre-specified rule (`hmm_v2/FIT_SELECTION_RULE.md`; read by `hmm_model_selection.inference_scope`). Tests, panels with p-values, and the Holm and BH families cover only the recurring states; switching rate and max FO carry a test only if they agree across fits (otherwise the figure says "not tested"). The group model of bootstrap Table S-E uses only those states. Descriptive tables and the presence figure keep every state. Without the file, the reported model (HMM-PCA 15, K = 4) is refused (`HMM_ALLOW_NO_SCOPE=1` overrides, for tests); other models are tested in full, with a warning. Each script first deletes its own earlier outputs (`fresh_output_dir`), so no table or figure from another scope is left behind. | S11: raw p identical to the unrestricted run (0), Holm over the listed states only (< 1e-18). S12: a scope file from another fit is refused (4 scripts). S13: with nothing to test, the scripts finish without tests and leave no earlier test output. S14: the reported model without a scope file is refused (4 scripts). |
+
+| P6 | (27 Oct 2026, D33) Defaults and the scope refusal hard-coded the K = 4, rank 15 model | `hmm_model_selection.py` reads `hmm_v2/MODEL_PRIMARY.env` (default) and `MODEL_SECONDARY.env`: the primary model (Gaussian HMM on 25 PCs, K = 3; run4d's `hmm_*_all_K_all_PCA.csv`, folder `hmmmar_simple_k3_pca25`, tag `pca25_k3`) unless `HMM_K` / `HMM_LOWRANK` / `HMM_PCA` are set; the secondary (HMM-PCA 15, K = 2) is selected by setting them (the job scripts do it from the file). Both reported models are refused without `inference_scope.csv`. | S9: every script runs end to end for both models (states 1–3 and 1–2, all outputs). S10: the defaults are the primary model. S14: both models refused without a scope file (8 runs). |
+| P7 | (27 Oct 2026, E50) With K = 2, occupancy of state 2 (1 − FO of state 1) was tested again and counted twice in the Holm family (and its contrasts twice in the BH pool) | `fo_test_plan` (hmm_model_selection.py): at K = 2, after checking on the data that each mouse's two occupancies sum to 1 (within 1e-6), state 2 takes state 1's test (`same_test_as = 1` in `omnibus_tests.csv` and `planned_contrasts.csv`; its contrasts keep their own means and t, sign reversed, and state 1's p and q); Holm and BH count the test once; the occupancy figure shows the one p on both panels. Dwell time, presence and graph metrics stay per state. | S15: state 2's test computed on its own equals state 1's (F within 1e-9, same permutation p); Holm p = p; t(2) = −t(1); q shared; BH over state 1's contrasts only; both figure panels show the one p. |
+
+| P8 | (27 Oct 2026, D35) No rule for comparing the two reported models | New `hmm_model_agreement.py` applies `hmm_null/MODEL_SELECTION_RULE.md` amendment 2 mechanically. Each tested primary state is paired with the secondary state whose pooled state FC (`state_fc_pooled_upper.csv` from `hmm_state_descriptors.m`) has the highest r; the pairing is written before any group table is read. Each planned contrast is classed by the two models' BH q and t sign. | `tests/test_model_agreement.py` A1–A6 (6/6): pairing and r; 82 classified rows equal an independent classification; no tested counterpart; whole-fit outcomes not tested in one model; class logic; a table from another fit refused after the pairing was written. |
+| P9 | (27 Oct 2026, E52) `brainnetwork_plotter_Rmigration_bin_transitivity.py` stopped with `KeyError: 'metric'` when only one state was tested (no pairs of states for the within-group comparisons) | The empty table keeps its columns and is written | S16: with one tested state all four scripts finish; the empty table has its columns. Found by the agreement test (secondary model with one recurring state). |
 
 ## Group tests (dynamics statistics, both figure scripts)
 
@@ -56,7 +63,7 @@ All of these are reached through `welch_tests_scipy.py`, the same module (byte-i
 
 ## Tests
 
-`python tests/test_hmm_python_stats.py`, from this folder. It runs every script on simulated inputs in the updated MATLAB formats (`tests/make_mock_inputs.py`), and runs the previous scripts (`tests/legacy/`, verbatim) on the same data. S1–S8 run at K = 3 (the previous scripts were written for it); S9 runs every updated script at K = 4, the reported model; S10 checks the defaults. **Run here: 14 passed, 0 failed (about 4 min).**
+`python tests/test_hmm_python_stats.py`, from this folder. It runs every script on simulated inputs in the updated MATLAB formats (`tests/make_mock_inputs.py`), and runs the previous scripts (`tests/legacy/`, verbatim) on the same data. S1–S8 run at K = 3 (the previous scripts were written for it); S9 runs every updated script for both reported models (P6); S10 checks the defaults; S11–S14 check the fit-selection scope (P5; S11–S13 at K = 4, a model that is not reported); S15 checks the K = 2 occupancy fix (P7); S16 one tested state (P9). **Run here (27 Oct 2026, SciPy 1.16): 20 passed, 0 failed (about 6 min); `tests/test_model_agreement.py`: 6 passed, 0 failed.**
 
 | Check | Result |
 |---|---|
@@ -70,7 +77,13 @@ All of these are reached through `welch_tests_scipy.py`, the same module (byte-i
 | S6 title p = table p | 0 |
 | S7 another fit refused | 3/3 |
 | S8 all outputs written | 4/4 |
-| S9 K = 4: all four scripts run, four states in the outputs | 4/4 |
-| S10 defaults: K = 4, rank 15, data folder on `/blue/febo/share` | pass |
+| S9 both reported models: all four scripts run; states 1–3 (primary) and 1–2 (secondary) in the outputs | 4/4 and 4/4 |
+| S10 defaults: primary model (K = 3, pca 25), data folder on `/blue/febo/share` | pass |
+| S11 scope: only listed states and outcomes tested; raw p unchanged; Holm over the listed states | 0 / < 1e-18 |
+| S12 scope file from another fit refused | 4/4 |
+| S13 nothing to test: scripts finish, no tests, no stale outputs | pass |
+| S14 both reported models without scope file refused | 8/8 |
+| S16 one tested state: all four scripts finish; empty state-comparison table keeps its columns | pass |
+| S15 K = 2 occupancy one test (state 2's own test = state 1's; Holm = p; t(2) = −t(1); q shared; figure panels equal) | pass (FO sums to 1 within 3e-16) |
 | Omnibus permutation p, updated vs previous (reported) | identical |
 | Contrast p, parametric vs permutation (reported) | median 0.005, max 0.06 |

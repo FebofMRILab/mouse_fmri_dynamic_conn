@@ -21,7 +21,7 @@ set -uo pipefail
 cd "$SLURM_SUBMIT_DIR"
 unset DISPLAY
 SIGNALS=${HMM_OUT_BASE:-/blue/febo/share/Abeta_Age/rabies/signals}
-DFC=${DFC_RESULTS:-$SIGNALS/dfc_dcc_cpca_pca15}
+DFC=${DFC_RESULTS:-$SIGNALS/dfc_dcc_cpca}
 DCC_CODE=${DCC_CODE:-/blue/febo/MATLAB/Lindquist_Dynamic_Correlation/DCC_toolbox/DCCcode}
 ENV=${ENV:-/blue/febo/$USER/envs/fc_static}
 for p in "$SIGNALS/hmm_signals/meta_data.csv" "$DFC/dfc_subject_metrics.csv" "$DCC_CODE/dcc_mvgarch.m" \

@@ -2,25 +2,28 @@
 """
 Manuscript-quality HMM-MAR plots.
 
-Inputs (run4d tables of the reported fit; hmm_model_selection.py, same
-settings as hmm_config.m: HMM-PCA rank 15, K = 4)
+Inputs (run4d tables of the chosen fit of one reported model;
+hmm_model_selection.py, same settings as hmm_config.m: primary = Gaussian HMM
+on 25 PCs, K = 3; secondary = HMM-PCA rank 15, K = 2; hmm_v2/MODEL_*.env)
 ------
-<signals>/hmm_switching_rates_all_K_all_lowrank.csv
-<signals>/hmm_maxFO_all_K_all_lowrank.csv
-<signals>/hmm_dwell_times_all_K_all_lowrank.csv
+<signals>/hmm_switching_rates_all_K_all_{PCA,lowrank}.csv
+<signals>/hmm_maxFO_all_K_all_{PCA,lowrank}.csv
+<signals>/hmm_dwell_times_all_K_all_{PCA,lowrank}.csv
 (<signals> = HMM_OUT_BASE, default /blue/febo/share/Abeta_Age/rabies/signals)
 Every table must carry the fit ID in <model folder>/fit_id.txt.
 
 Outputs
 -------
-<signals>/hmm_dynamics_figures_hmmpca15_k4/
+<signals>/hmm_dynamics_figures_<tag>/   (tag pca25_k3 or hmmpca15_k2)
 
 Styling matches Figure 6 (static graph metrics) in full_analysis_abeta_mice.py
 and the HMM graph-metric figures: same palette, group labels, effective font
 sizes, box/point styling and panel size. Panel titles carry Welch ANOVA
 permutation p-values (welch_tests_scipy.py; Holm-corrected across states
 within each figure), as in Figure 6. hmm_dynamic_stats.py computes the same
-tests with the same seed, so titles and tables agree.
+tests with the same seed, so titles and tables agree. K = 2 occupancy: the two
+states' FO sum to 1, so the test is run and counted once and both panels show
+its p (E50).
 """
 
 # ============================================================
@@ -350,19 +353,23 @@ def draw_distribution(ax, dataframe, outcome, rng):
         )
 
 
-def create_subject_metric_figure(dataframe, outcome, ylabel, filename):
-    """One Figure 6-sized panel for a metric with one row per subject."""
+def create_subject_metric_figure(dataframe, outcome, ylabel, filename, test=True):
+    """One Figure 6-sized panel for a metric with one row per subject.
+    test=False (fit-selection rule): drawn without a group test."""
     fig, ax = plt.subplots(
         figsize=(PANEL_SIZE, PANEL_SIZE + 0.3),
         constrained_layout=True,
     )
     rng = np.random.default_rng(RANDOM_SEED)
 
-    p_value = welch_anova_p(dataframe, outcome)
-    record_tests(filename, outcome, ["all subjects"], [p_value], [p_value], "Welch ANOVA (permutation)")
-
     draw_distribution(ax, dataframe, outcome, rng)
-    format_group_axis(ax, ylabel, panel_title("", p_value))
+    if test:
+        p_value = welch_anova_p(dataframe, outcome)
+        record_tests(filename, outcome, ["all subjects"], [p_value], [p_value],
+                     "Welch ANOVA (permutation)")
+        format_group_axis(ax, ylabel, panel_title("", p_value))
+    else:
+        format_group_axis(ax, ylabel, "not tested (varies across fits)")
     add_vertical_padding(ax, dataframe[outcome])
 
     save_manuscript_figure(fig, filename)
@@ -378,9 +385,17 @@ def create_state_metric_figure(
     log_scale=False,
     test_transform=None,
     test_name="Welch ANOVA",
+    same_test=None,
 ):
-    """One row of state panels, shared y-axis, Holm across states."""
+    """One row of state panels, shared y-axis, Holm across states.
+
+    same_test: {state: state whose test it uses} (hmm_model_selection.fo_test_plan).
+    A state mapped to another (K = 2 occupancy: FO = 1 - FO of the other state,
+    E50) is not tested again: its panel shows that state's p, and the Holm
+    family counts the test once.
+    """
     n_states = len(state_order)
+    same_test = same_test or {s: s for s in state_order}
 
     fig, axes = plt.subplots(
         1,
@@ -393,12 +408,20 @@ def create_state_metric_figure(
     axes = axes.ravel()
     rng = np.random.default_rng(RANDOM_SEED)
 
-    raw_p = [
+    own = [s for s in state_order if same_test[s] == s]
+    own_raw = [
         welch_anova_p(dataframe.loc[dataframe["state"] == s], outcome, test_transform)
-        for s in state_order
+        for s in own
     ]
-    adjusted_p = holm(raw_p)
-    record_tests(filename, outcome, state_order, raw_p, adjusted_p, test_name)
+    own_adjusted = dict(zip(own, holm(own_raw)))
+    own_raw = dict(zip(own, own_raw))
+    raw_p = [own_raw[same_test[s]] for s in state_order]
+    adjusted_p = [own_adjusted[same_test[s]] for s in state_order]
+    names = [test_name if same_test[s] == s
+             else f"{test_name} (same test as {same_test[s]}: FO = 1 - FO; counted once)"
+             for s in state_order]
+    for s, p_raw, p_adj, name in zip(state_order, raw_p, adjusted_p, names):
+        record_tests(filename, outcome, [s], [p_raw], [p_adj], name)
 
     all_values = (
         dataframe[outcome]
@@ -654,6 +677,16 @@ print(f"Max-FO subjects: {maxfo['subject_id'].nunique()}")
 print(f"State-level subjects: {state_metrics['subject_id'].nunique()}")
 print(f"States: {STATE_ORDER}")
 
+# What is tested (hmm_v2/FIT_SELECTION_RULE.md): occupancy and dwell figures
+# show and test only the states that recur across independent fits (Holm across
+# those); switching rate and max FO carry a test only if they agree across fits.
+SCOPE = sel.inference_scope()
+print(SCOPE["source"])
+sel.fresh_output_dir(OUTPUT_DIR, ["figure*", "*.csv"])
+TESTED_STATES = [state_label_map[s] for s in sel.tested_states(raw_state_order, SCOPE)]
+tested_metrics = state_metrics.loc[state_metrics["state"].isin(TESTED_STATES)].copy()
+tested_metrics["state"] = tested_metrics["state"].cat.set_categories(TESTED_STATES, ordered=True)
+
 
 # ============================================================
 # SAVE SELECTED DATASETS
@@ -760,6 +793,7 @@ create_subject_metric_figure(
     outcome="switching_rate",
     ylabel="Switching rate",
     filename="figure1_switching_rate_by_group",
+    test=SCOPE["switching_rate"],
 )
 
 
@@ -772,6 +806,7 @@ create_subject_metric_figure(
     outcome="max_FO",
     ylabel="Maximum fractional occupancy",
     filename="figure2_maxFO_by_group",
+    test=SCOPE["max_FO"],
 )
 
 
@@ -779,13 +814,15 @@ create_subject_metric_figure(
 # FIGURE 3: FRACTIONAL OCCUPANCY BY STATE
 # ============================================================
 
-create_state_metric_figure(
-    dataframe=state_metrics,
-    outcome="fractional_occupancy",
-    ylabel="Fractional occupancy",
-    filename="figure3_fractional_occupancy_by_group_state",
-    state_order=STATE_ORDER,
-)
+if TESTED_STATES:
+    create_state_metric_figure(
+        dataframe=tested_metrics,
+        outcome="fractional_occupancy",
+        ylabel="Fractional occupancy",
+        filename="figure3_fractional_occupancy_by_group_state",
+        state_order=TESTED_STATES,
+        same_test=sel.fo_test_plan(TESTED_STATES, SELECTED_K, tested_metrics),   # K = 2: one test (E50)
+    )
 
 
 # ============================================================
@@ -889,10 +926,10 @@ plt.close(fig)
 # FIGURES 5 AND 6: MEAN DWELL TIME (linear and log scale)
 # ============================================================
 
-dwell_observed = state_metrics.loc[
-    (state_metrics["n_dwell_episodes"] > 0)
-    & np.isfinite(state_metrics["mean_dwell_seconds"])
-    & (state_metrics["mean_dwell_seconds"] > 0)
+dwell_observed = tested_metrics.loc[
+    (tested_metrics["n_dwell_episodes"] > 0)
+    & np.isfinite(tested_metrics["mean_dwell_seconds"])
+    & (tested_metrics["mean_dwell_seconds"] > 0)
 ].copy()
 
 dwell_test = dict(
@@ -900,32 +937,34 @@ dwell_test = dict(
     test_name="Welch ANOVA on log10(dwell)" if DWELL_TEST_ON_LOG else "Welch ANOVA",
 )
 
-create_state_metric_figure(
-    dataframe=dwell_observed,
-    outcome="mean_dwell_seconds",
-    ylabel="Mean dwell time (s)",
-    filename="figure5_mean_dwell_by_group_state",
-    state_order=STATE_ORDER,
-    **dwell_test,
-)
+if TESTED_STATES:
+    create_state_metric_figure(
+        dataframe=dwell_observed,
+        outcome="mean_dwell_seconds",
+        ylabel="Mean dwell time (s)",
+        filename="figure5_mean_dwell_by_group_state",
+        state_order=TESTED_STATES,
+        **dwell_test,
+    )
 
-# Same test as Figure 5, so both figures show the same p-values.
-create_state_metric_figure(
-    dataframe=dwell_observed,
-    outcome="mean_dwell_seconds",
-    ylabel="Mean dwell time (s)",
-    filename="figure6_mean_dwell_by_group_state_log_scale",
-    state_order=STATE_ORDER,
-    log_scale=True,
-    **dwell_test,
-)
+    # Same test as Figure 5, so both figures show the same p-values.
+    create_state_metric_figure(
+        dataframe=dwell_observed,
+        outcome="mean_dwell_seconds",
+        ylabel="Mean dwell time (s)",
+        filename="figure6_mean_dwell_by_group_state_log_scale",
+        state_order=TESTED_STATES,
+        log_scale=True,
+        **dwell_test,
+    )
 
 
 # ============================================================
 # GROUP TESTS SHOWN IN PANEL TITLES
 # ============================================================
 
-tests_table = pd.DataFrame(STATS_ROWS).drop_duplicates(
+tests_table = pd.DataFrame(STATS_ROWS, columns=["figure", "outcome", "panel", "test", "p_raw",
+                                               "p_Holm_within_figure"]).drop_duplicates(
     subset=["outcome", "panel", "test"]
 )
 tests_table["fit_id"] = next(iter(FIT_IDS), "not recorded")
@@ -947,7 +986,9 @@ manifest = [
     f"Switching-rate subjects: {switching['subject_id'].nunique()}",
     f"Max-FO subjects: {maxfo['subject_id'].nunique()}",
     f"State-level subjects: {state_metrics['subject_id'].nunique()}",
-    f"States: {', '.join(map(str, STATE_ORDER))}",
+    f"States: {', '.join(map(str, STATE_ORDER))} (presence figure: every state)",
+    f"States tested (occupancy and dwell figures): {', '.join(map(str, TESTED_STATES)) or 'none'}",
+    f"Scope: {SCOPE['source']}",
     f"Group order: {', '.join(GROUP_ORDER)}",
     f"Font family: {FONT_FAMILY}",
     f"PNG resolution: {PNG_DPI} dpi",

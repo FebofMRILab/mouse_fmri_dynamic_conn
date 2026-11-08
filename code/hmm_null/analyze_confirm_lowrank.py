@@ -19,7 +19,21 @@ similarity per split r (mean over matched states, as in MATLAB):
                  weakest state replicates better in observed than null
 Drift (full fits, observed data): per state, occupancy in the 2nd minus 1st
 scan half per mouse; two-sided Wilcoxon across mice, Holm across states
-within each model x K.
+within each model x K. At K = 2 the two states' changes are each other's
+negative (occupancies sum to 1), so the two tests are one test: counted once,
+no Holm doubling (E50, 27 Oct 2026).
+
+Estimates and intervals (27 Oct 2026, E51): the calibrated difference c and
+the drift change are shown with the Hodges-Lehmann estimate (median of the
+Walsh averages) and its distribution-free 95% CI, the interval obtained by
+inverting the Wilcoxon signed-rank test (exact null distribution for n <= 50,
+as scipy.stats.wilcoxon uses; normal approximation above). The CI is
+unadjusted; a cell filled in the figure has Holm p < 0.05, and Holm p < 0.05
+implies that the CI excludes 0. confirm_cells.csv keeps median c (the
+statistic of MODEL_SELECTION_RULE.md item 6) and its bootstrap CI, and adds
+hl_estimate, hl_ci_low, hl_ci_high, hl_ci_coverage and rank_biserial (the
+matched-pairs rank-biserial correlation of c, (T+ - T-) / (T+ + T-), a
+scale-free effect size; MODEL_SELECTION_RULE.md amendment 1).
 
 Usage
     python analyze_confirm_lowrank.py --root hmm_confirm_lowrank
@@ -57,6 +71,14 @@ SERIES = [("obs", "Observed", INK), ("null", "Phase null", "#2a78d6"),
           ("rep", "Stationary replica", MUTED), ("repnull", "Replica's phase null", "#eb6834")]
 ALPHA = 0.05
 SEED = 20261001
+
+
+def complements(ok):
+    """K = 2 occupancy table of one fit: is every mouse's per-quarter occupancy of
+    state 2 one minus that of state 1 (within 1e-6)? Then the two drift tests
+    are one test (E50)."""
+    w = ok.pivot_table(index=["subject_id", "quarter"], columns="state", values="fo_quarter")
+    return w.shape[1] == 2 and bool(((w.iloc[:, 0] + w.iloc[:, 1] - 1).abs() < 1e-6).all())
 
 
 def holm(p):
@@ -118,9 +140,83 @@ def median_ci(x, rng, n_boot=10000):
     return float(np.median(x)), *np.percentile(m, [2.5, 97.5]).tolist()
 
 
+def _signed_rank_null_cdf(n):
+    """P(T+ <= t), t = 0 .. n(n+1)/2, for the Wilcoxon signed-rank statistic
+    with n nonzero, untied differences: exact, by counting the subsets of
+    {1..n} with each rank sum."""
+    m = n * (n + 1) // 2
+    counts = [0] * (m + 1)
+    counts[0] = 1
+    for r in range(1, n + 1):
+        for t in range(m, r - 1, -1):
+            counts[t] += counts[t - r]
+    total = 2 ** n
+    run, cdf = 0, np.empty(m + 1)
+    for t, c in enumerate(counts):
+        run += c
+        cdf[t] = run / total
+    return cdf
+
+
+def hodges_lehmann(x, conf=0.95):
+    """Hodges-Lehmann estimate of the centre of x and its CI from inverting the
+    two-sided Wilcoxon signed-rank test (Hollander, Wolfe & Chicken 2014,
+    Nonparametric Statistical Methods, 3rd ed., section 3.3).
+
+    Walsh averages W = (x_i + x_j)/2, i <= j, sorted (M = n(n+1)/2 of them);
+    estimate = median(W); CI = [W_(d), W_(M+1-d)], where d - 1 is the largest
+    t with P(T+ <= t) <= (1 - conf)/2. Exact null distribution for n <= 50
+    (as scipy.stats.wilcoxon); normal approximation (with continuity) above.
+    Returns (estimate, low, high, achieved coverage); NaN if n < 6."""
+    x = np.asarray(x, float)
+    x = x[np.isfinite(x)]
+    n = x.size
+    if n < 6:
+        return np.nan, np.nan, np.nan, np.nan
+    i, j = np.triu_indices(n)
+    w = np.sort((x[i] + x[j]) / 2)
+    m = w.size
+    a = (1 - conf) / 2
+    if n <= 50:
+        cdf = _signed_rank_null_cdf(n)
+        ok = np.nonzero(cdf <= a)[0]
+        if ok.size == 0:
+            return float(np.median(w)), np.nan, np.nan, np.nan
+        d = int(ok[-1]) + 1
+        cover = 1 - 2 * cdf[d - 1]
+    else:
+        mu, sd = m / 2, np.sqrt(n * (n + 1) * (2 * n + 1) / 24)
+        d = max(1, int(np.floor(mu - stats.norm.ppf(1 - a) * sd + 0.5)))
+        cover = 1 - 2 * stats.norm.cdf((d - 1 + 0.5 - mu) / sd)
+    return float(np.median(w)), float(w[d - 1]), float(w[m - d]), float(cover)
+
+
+def rank_biserial(x):
+    """Matched-pairs rank-biserial correlation (T+ - T-) / (T+ + T-), ranks of
+    |x| over the nonzero x (Kerby 2014, simple difference formula)."""
+    x = np.asarray(x, float)
+    x = x[np.isfinite(x) & (x != 0)]
+    if x.size == 0:
+        return np.nan
+    r = stats.rankdata(np.abs(x))
+    tp, tm = r[x > 0].sum(), r[x < 0].sum()
+    return float((tp - tm) / (tp + tm))
+
+
 def rank_of(label):
     digits = re.sub(r"[^0-9]", "", label)
     return digits or label
+
+
+def model_name(label, short=False):
+    """Display name only (27 Oct 2026, for the candidate test of MODEL_SELECTION_RULE.md):
+    lowrank_r -> PCA-HMM rank r (unchanged for step 6); gaussian_pca_d -> Gaussian, PCA-d;
+    gaussian_full -> Gaussian, all ROIs."""
+    if label.startswith("gaussian_pca_"):
+        return f"Gaussian, PCA-{rank_of(label)}"
+    if label == "gaussian_full":
+        return "Gaussian, all ROIs"
+    return f"rank {rank_of(label)}" if short else f"PCA-HMM, rank {rank_of(label)}"
 
 
 def fmt_p(p):
@@ -171,7 +267,10 @@ def main():
                            delta_replica=r.median() - rn.median(), p_replica=mw_greater(r, rn))
                 c = ((o - n) - (r - rn)).dropna()
                 med, lo, hi = median_ci(c, rng)
+                hl, hl_lo, hl_hi, hl_cov = hodges_lehmann(c)
                 row.update(n_paired=len(c), calibrated_median=med, ci_low=lo, ci_high=hi,
+                           hl_estimate=hl, hl_ci_low=hl_lo, hl_ci_high=hl_hi,
+                           hl_ci_coverage=hl_cov, rank_biserial=rank_biserial(c),
                            p_calibrated=wilcoxon_greater(c))
             cells.append(row)
     T = pd.DataFrame(cells)
@@ -199,12 +298,21 @@ def main():
                 w = sk.pivot_table(index="subject_id", columns="quarter", values="fo_quarter")
                 d = (w[3] + w[4]) / 2 - (w[1] + w[2]) / 2
                 p = float(stats.wilcoxon(d).pvalue) if (d != 0).sum() > 5 else np.nan
+                hl, hl_lo, hl_hi, _ = hodges_lehmann(d.to_numpy(float))
                 rows.append(dict(model=lab, K=int(K), state=int(k), n=len(d),
                                  fo_total=sk.drop_duplicates("subject_id").fo_total.mean(),
                                  median_change=d.median(), frac_increase=float((d > 0).mean()),
-                                 p_two_sided=p))
+                                 p_two_sided=p, hl_change=hl, hl_ci_low=hl_lo, hl_ci_high=hl_hi))
             rows = pd.DataFrame(rows)
-            rows["p_holm_within_K"] = holm(rows.p_two_sided)
+            if int(K) == 2 and len(rows) == 2 and complements(ok):
+                # one test: state 2's change is minus state 1's (E50)
+                rows["p_two_sided"] = rows.p_two_sided.iloc[0]
+                rows["p_holm_within_K"] = rows.p_two_sided.iloc[0]
+                rows["note"] = ["", "same test as state 1 (change = minus state 1's); counted once"]
+            else:
+                rows["p_holm_within_K"] = holm(rows.p_two_sided)
+                rows["note"] = ("K = 2 but the occupancies are not complements: Holm over both"
+                                if int(K) == 2 else "")
             drift.append(rows)
     D = pd.concat(drift, ignore_index=True) if drift else pd.DataFrame()
     if not D.empty:
@@ -237,7 +345,7 @@ def main():
         ax.set_xlabel("K", fontsize=8.5)
         ax.set_ylabel("Split-half similarity (demeaned)", fontsize=8.5)
         ax.tick_params(labelsize=7)
-        ax.set_title(f"PCA-HMM, rank {rank_of(lab)}", fontsize=8.5, loc="left")
+        ax.set_title(model_name(lab), fontsize=8.5, loc="left")
         sns.despine(ax=ax)
         ax.text(-0.3, 1.14, next(letters), transform=ax.transAxes, fontsize=11,
                 fontweight="bold")
@@ -250,9 +358,9 @@ def main():
     ax = fig.add_subplot(gs[0, 2])
     y = np.arange(len(T))[::-1]
     for yi, (_, r) in zip(y, T.iterrows()):
-        if np.isfinite(r.get("calibrated_median", np.nan)):
-            ax.plot([r.ci_low, r.ci_high], [yi, yi], color=SECONDARY, lw=1.1)
-            ax.plot(r.calibrated_median, yi, "o", ms=4.5,
+        if np.isfinite(r.get("hl_estimate", np.nan)):
+            ax.plot([r.hl_ci_low, r.hl_ci_high], [yi, yi], color=SECONDARY, lw=1.1)
+            ax.plot(r.hl_estimate, yi, "o", ms=4.5,
                     mfc=INK if r.state_structure else "white", mec=INK, mew=1.0)
         ps = fmt_p(r.p_calibrated_holm)
         ax.text(1.04, yi, ("p" if ps.startswith("<") else "p=") + ps,
@@ -260,11 +368,11 @@ def main():
                 fontsize=6.3, va="center", color=INK if r.state_structure else SECONDARY)
     ax.axvline(0, color=BASELINE, lw=0.8, zorder=0)
     ax.set_yticks(y)
-    ax.set_yticklabels([f"rank {rank_of(m)}, K={k}" for m, k in zip(T.model, T.K)],
+    ax.set_yticklabels([f"{model_name(m, short=True)}, K={k}" for m, k in zip(T.model, T.K)],
                        fontsize=7)
-    ax.set_xlabel("Calibrated difference\n(median, 95% CI)", fontsize=8)
+    ax.set_xlabel("Calibrated difference c\n(Hodges-Lehmann, 95% CI, unadjusted)", fontsize=8)
     ax.tick_params(axis="x", labelsize=7)
-    ax.set_title("Pre-specified test (Holm p)", fontsize=8, loc="left")
+    ax.set_title("Pre-specified test (filled: Holm p < 0.05)", fontsize=8, loc="left")
     sns.despine(ax=ax)
     ax.text(-0.9, 1.14, next(letters), transform=ax.transAxes, fontsize=11, fontweight="bold")
 
@@ -281,22 +389,17 @@ def main():
             ax.axis("off")
             continue
         yy = np.arange(len(d))[::-1]
-        occ = occ_all[lab]
         for yi, (_, r) in zip(yy, d.iterrows()):
-            sk = occ[(occ.K == r.K) & (occ.state == r.state)]
-            w = sk.pivot_table(index="subject_id", columns="quarter", values="fo_quarter")
-            ch = ((w[3] + w[4]) / 2 - (w[1] + w[2]) / 2).to_numpy()
-            med, lo, hi = median_ci(ch, rng, 4000)
             sig = r.p_holm_within_K < ALPHA
-            ax.plot([lo, hi], [yi, yi], color=SECONDARY, lw=1.1)
-            ax.plot(med, yi, "o", ms=4.5, mfc=INK if sig else "white", mec=INK, mew=1.0)
+            ax.plot([r.hl_ci_low, r.hl_ci_high], [yi, yi], color=SECONDARY, lw=1.1)
+            ax.plot(r.hl_change, yi, "o", ms=4.5, mfc=INK if sig else "white", mec=INK, mew=1.0)
         ax.axvline(0, color=BASELINE, lw=0.8, zorder=0)
         ax.set_yticks(yy)
         ax.set_yticklabels([f"K={k}, state {s} ({100 * f:.0f}%)"
                             for k, s, f in zip(d.K, d.state, d.fo_total)], fontsize=6.5)
-        ax.set_xlabel("Occupancy, 2nd − 1st scan half", fontsize=8)
+        ax.set_xlabel("Occupancy, 2nd − 1st scan half\n(Hodges-Lehmann, 95% CI, unadjusted)", fontsize=8)
         ax.tick_params(axis="x", labelsize=7)
-        ax.set_title(f"Drift, rank {rank_of(lab)} (filled: Holm p < 0.05)",
+        ax.set_title(f"Drift, {model_name(lab, short=True)} (filled: Holm p < 0.05)",
                      fontsize=8, loc="left")
         sns.despine(ax=ax)
         ax.text(-0.55, 1.06, next(letters), transform=ax.transAxes, fontsize=11,
@@ -309,7 +412,8 @@ def main():
     # ---------------- console ----------------
     pd.set_option("display.width", 220)
     cols = ["model", "K", "n_paired", "delta_uncal", "p_uncal", "delta_replica",
-            "calibrated_median", "ci_low", "ci_high", "p_calibrated", "p_calibrated_holm",
+            "calibrated_median", "ci_low", "ci_high", "hl_estimate", "hl_ci_low", "hl_ci_high",
+            "rank_biserial", "p_calibrated", "p_calibrated_holm",
             "weakest_obs", "weakest_null", "state_structure"]
     print(f"\nPre-specified cells ({args.null} null):")
     print(T[[c for c in cols if c in T]].round(4).to_string(index=False))
@@ -318,7 +422,7 @@ def main():
                             ", ".join(f"{m} K={k}" for m, k in zip(hits.model, hits.K))
                             if len(hits) else "no cell meets the pre-specified criterion"))
     if not D.empty:
-        print("\nOccupancy drift (Holm within K):")
+        print("\nOccupancy drift (Holm within K; K = 2: one test):")
         print(D.round(4).to_string(index=False))
     print(f"\nOutputs in {out}")
 
