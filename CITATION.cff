@@ -3,6 +3,15 @@ message: "If you use this code, please cite the paper and this software."
 title: "mouse_fmri_dynamic_conn: static and dynamic functional connectivity analysis of mouse resting-state fMRI"
 type: software
 version: 1.0.0
+doi: "10.5281/zenodo.24431471"
+date-released: "2026-11-22"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.24431472"
+    description: "Version 1.0.0, used for the paper"
+  - type: doi
+    value: "10.5281/zenodo.24431471"
+    description: "All versions (concept DOI)"
 license: CC0-1.0
 repository-code: "https://github.com/FebofMRILab/mouse_fmri_dynamic_conn"
 authors:

@@ -1,5 +1,7 @@
 # mouse_fmri_dynamic_conn
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24431472.svg)](https://doi.org/10.5281/zenodo.24431472)
+
 Code for static and dynamic functional connectivity (FC) analysis of mouse resting-state fMRI. It accompanies:
 
 > Grudny MM, Rodriguez N, et al. *Multi-method assessment of functional connectivity in TgCRND8 and 5XFAD mice reveals robust static and hidden Markov state effects of amyloidosis.* (eLife, submitted; preprint doi:10.64898/2026.04.26.720907)
@@ -125,4 +127,8 @@ Code comments cite IDs such as D33 or E47. These refer to the authors' provenanc
 
 ## Citation and licence
 
-Please cite the paper and this code (DOI: to be added on release; see `CITATION.cff`). Licence: CC0 1.0 (`LICENSE`).
+Please cite the paper and this code (`CITATION.cff`). The code is archived at Zenodo:
+- v1.0.0, the version used for the paper: [doi:10.5281/zenodo.24431472](https://doi.org/10.5281/zenodo.24431472)
+- all versions: [doi:10.5281/zenodo.24431471](https://doi.org/10.5281/zenodo.24431471)
+
+Licence: CC0 1.0 (`LICENSE`).
