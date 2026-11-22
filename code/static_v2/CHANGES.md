@@ -30,6 +30,8 @@
 
 ## C9: `roi_group_table.py` (new; replaces `statistical_table.r`)
 
+**Updated 16 Nov 2026.** The script now builds the paper's nodal tables for the three nodal metrics directly from the main script's `node_metrics_by_density.csv`, using the same Welch functions (`welch_tests_scipy.py`). The test below covered the previous version and its interface; that version and its test are kept in the authors' archive.
+
 | | `statistical_table.r` | `roi_group_table.py` |
 |---|---|---|
 | Omnibus per ROI | Kruskal–Wallis, BH across ROIs | Welch ANOVA, p from 10,000 permutations, df from statsmodels; BH across ROIs |

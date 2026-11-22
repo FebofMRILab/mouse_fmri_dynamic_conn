@@ -1,0 +1,49 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the paper and this software."
+title: "mouse_fmri_dynamic_conn: static and dynamic functional connectivity analysis of mouse resting-state fMRI"
+type: software
+version: 1.0.0
+license: CC0-1.0
+repository-code: "https://github.com/FebofMRILab/mouse_fmri_dynamic_conn"
+authors:
+  - family-names: Febo
+    given-names: Marcelo
+    affiliation: "Department of Psychiatry, University of Florida"
+    orcid: "https://orcid.org/0000-0001-8981-4163"
+keywords:
+  - fMRI
+  - mouse
+  - functional connectivity
+  - hidden Markov model
+  - DCC-GARCH
+  - complex PCA
+  - amyloid
+preferred-citation:
+  type: article
+  title: "Multi-method assessment of functional connectivity in TgCRND8 and 5XFAD mice reveals robust static and hidden Markov state effects of amyloidosis"
+  authors:
+    - family-names: Grudny
+      given-names: Matteo M.
+    - family-names: Rodriguez
+      given-names: Nicholas
+    - family-names: Murdy
+      given-names: Thomas J.
+    - family-names: Simon
+      given-names: Zachary D.
+    - family-names: Vo
+      given-names: Quan
+    - family-names: Li
+      given-names: Wen
+    - family-names: Burns
+      given-names: Matthew R.
+    - family-names: Lamb
+      given-names: Damon G.
+    - family-names: Kaczorowski
+      given-names: Catherine C.
+    - family-names: Chakrabarty
+      given-names: Paramita
+    - family-names: Febo
+      given-names: Marcelo
+      orcid: "https://orcid.org/0000-0001-8981-4163"
+  doi: "10.64898/2026.04.26.720907"
+  notes: "Preprint (bioRxiv); eLife version to be added on publication."

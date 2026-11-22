@@ -8,13 +8,16 @@ against the same quantity in its 19 phase-randomised surrogates.
   A-C  rho(t) for components 1-2, 1-3, 2-3 (fixed in advance): the mouse (line),
        the surrogates' pointwise 2.5-97.5 % range (band) and median, and the
        static correlation (dotted)
-  D    every component pair: SD over time of rho(t) in the mouse against the
-       mean of its surrogates (the pipeline's corr_fluct is the mean of these)
+
+The former panel D (SD over time of rho(t) for every pair, mouse against its
+surrogates) was removed on 11 Nov 2026: a single mouse's pair-by-pair scatter
+invited a reading the paper does not make. dcc_example_traces.m still writes
+dcc_example_pair_sd.csv; it is no longer read here.
 
 Reads the folder written by dcc_example_traces.m:
     python plot_dcc_example.py --in_dir dfc_dcc_cpca/dcc_example
 Writes FigS_dcc_example.{pdf,png} and FigS_dcc_example_caption.txt there.
-Display only; the inference is the calibrated test in run_dcc_cpca_null.m.
+Display only; the inference is the test across mice (plot_dfc_results.py).
 """
 import argparse
 import os
@@ -42,7 +45,6 @@ def main():
     args = ap.parse_args()
     d = args.in_dir
     tr = pd.read_csv(os.path.join(d, "dcc_example_traces.csv"))
-    sd = pd.read_csv(os.path.join(d, "dcc_example_pair_sd.csv"))
     par = pd.read_csv(os.path.join(d, "dcc_example_params.csv"))
     info = open(os.path.join(d, "dcc_example_info.txt")).read()
     mouse = re.search(r"mouse_id: (\d+)", info).group(1)
@@ -50,19 +52,11 @@ def main():
 
     inp = re.search(r"Input: (\d+) group-PCA components .*?\(TR ([0-9.]+) s\)", info)
     n_comp, tr_eff = (inp.group(1), inp.group(2)) if inp else ("?", "?")
-    obs = par[par.source == "observed"].iloc[0]
-    sur = par[par.source != "observed"]
-    n_surr = len(sur)
-
-    def z(col):
-        s_ = sur[col].std(ddof=1)
-        return (obs[col] - sur[col].mean()) / s_ if s_ > 0 else float("nan")
-    z_a, z_cf = z("dcc_a"), z("corr_fluct")
-    n_above = int((sd.sd_observed > sd.sd_surr_mean).sum())
+    n_surr = int((par.source != "observed").sum())
 
     pairs = list(dict.fromkeys(tr.pair))
-    fig = plt.figure(figsize=(10.5, 6.2))
-    gs = fig.add_gridspec(len(pairs), 2, width_ratios=[2.5, 1.15], wspace=0.28, hspace=0.45)
+    fig = plt.figure(figsize=(7.4, 6.2))
+    gs = fig.add_gridspec(len(pairs), 1, hspace=0.45)
     for i, pr in enumerate(pairs):
         ax = fig.add_subplot(gs[i, 0])
         x = tr[tr.pair == pr]
@@ -91,30 +85,7 @@ def main():
                Line2D([], [], color=SURR, lw=0.9, label="surrogate median"),
                Line2D([], [], color=pdr.SECONDARY, lw=0.9, ls=":", label="static correlation")]
     fig.legend(handles=handles, loc="lower center", ncol=4, frameon=False, fontsize=8,
-               bbox_to_anchor=(0.36, -0.035))
-
-    ax = fig.add_subplot(gs[:, 1])
-    lo = min(sd.sd_observed.min(), sd.sd_surr_mean.min())
-    hi = max(sd.sd_observed.max(), sd.sd_surr_mean.max())
-    pad = 0.05 * (hi - lo)
-    lim = (lo - pad, hi + pad)
-    ax.plot(lim, lim, color=pdr.BASELINE, lw=1.0, zorder=1)
-    ax.scatter(sd.sd_surr_mean, sd.sd_observed, s=10, color=OBS, alpha=0.55, lw=0, zorder=2)
-    ax.set_xlim(lim)
-    ax.set_ylim(lim)
-    ax.set_aspect("equal", adjustable="box")
-    ax.set_xlabel("SD of ρ(t), mean of surrogates", fontsize=9)
-    ax.set_ylabel("SD of ρ(t), mouse", fontsize=9)
-    ax.set_title(f"All {len(sd)} component pairs", fontsize=pdr.TITLE_FONTSIZE + 1, loc="left")
-    ax.tick_params(labelsize=8)
-    for s in ("top", "right"):
-        ax.spines[s].set_visible(False)
-    ax.text(0.0, -0.24, f"Pairs above the line: {n_above} of {len(sd)}\n"
-            f"Mean over pairs: {obs.corr_fluct:.3f} vs {sur.corr_fluct.mean():.3f} "
-            f"in surrogates (z = {z_cf:.1f})\n"
-            f"DCC a: {obs.dcc_a:.3f} vs {sur.dcc_a.mean():.3f} (z = {z_a:.1f})",
-            transform=ax.transAxes, ha="left", va="top", fontsize=7.5, color=pdr.SECONDARY)
-    ax.text(-0.2, 1.03, "D", transform=ax.transAxes, fontsize=11, fontweight="bold")
+               bbox_to_anchor=(0.5, -0.035))
     pdr.save(fig, d, "FigS_dcc_example", args.formats)
 
     cap = (
@@ -125,12 +96,8 @@ def main():
         f"AR(2) residuals. (A-C) ρ(t) for the three largest components (pairs fixed in advance), with the "
         f"pointwise 2.5-97.5 % range and median of the same quantity in the mouse's {n_surr} "
         f"phase-randomised surrogates, which keep its spectra and static correlation but remove "
-        f"non-stationarity. Dotted line: static correlation. (D) For all {len(sd)} component pairs, the "
-        f"SD over time of ρ(t) in the mouse against the mean over its surrogates; the mean over pairs is "
-        f"the correlation-fluctuation measure. In this mouse: {n_above} of {len(sd)} pairs above the "
-        f"identity line; mean SD {obs.corr_fluct:.3f} vs {sur.corr_fluct.mean():.3f} in the surrogates "
-        f"(z = {z_cf:.1f}); DCC a {obs.dcc_a:.3f} vs {sur.dcc_a.mean():.3f} (z = {z_a:.1f}). "
-        "Display only: the inference is the calibrated test across mice.")
+        f"non-stationarity. Dotted line: static correlation. "
+        "Display only: the inference is the test across mice.")
     open(os.path.join(d, "FigS_dcc_example_caption.txt"), "w").write(cap + "\n")
     print(cap)
 

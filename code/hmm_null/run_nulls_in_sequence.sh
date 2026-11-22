@@ -14,6 +14,7 @@
 #   bash run_nulls_in_sequence.sh both      # step 5 phase -> step 6 phase -> step 5 IAAFT -> step 6 IAAFT
 # Step 5's IAAFT run follows README_hipergator.md (model 1, K 2-4); override with
 #   IAAFT_MODELS="all" or "1 2 3", IAAFT_K="2:6".
+#  IAAFT_MODELS="all" IAAFT_K="2:10" bash run_nulls_in_sequence.sh split
 # Progress: logs/null_sequence.log (one line per stage with its job IDs).
 # Afterwards (by hand): python plot_hmm_splithalf_null.py;
 #   python analyze_confirm_lowrank.py --root hmm_confirm_lowrank [--null iaaft]

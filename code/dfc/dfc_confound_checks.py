@@ -2,9 +2,15 @@
 """
 dfc_confound_checks.py
 -------------------------------------------------------------------
-Is the positive calibrated non-stationarity test (DCC / GARCH / cPCA
-envelope) explained by stationary non-Gaussian transients, head motion, or
-slow drift over the scan, rather than by time-varying coupling?
+Is the positive calibrated non-stationarity test (DCC / GARCH) explained by
+stationary non-Gaussian transients, head motion, or slow drift over the scan,
+rather than by time-varying coupling?
+
+Outcomes are the six pre-specified DCC/GARCH measures (as in
+plot_dfc_results.py). The complex-PCA envelope CV was removed from the paper on
+10 Nov 2026 (not an output of the published complex_pca code), so it is no
+longer an outcome here; this also shrinks the BH family of analysis A from
+70 to 60 outcome x covariate pairs.
 
 The calibrated test compares each mouse with a stationary GAUSSIAN replica,
 so it rejects anything the data have that such a process lacks. Three
@@ -81,10 +87,9 @@ from matplotlib.colors import LinearSegmentedColormap
 
 # ---------------- settings ----------------
 PRIMARY_TESTS = ["dcc_a", "dcc_LR", "corr_fluct", "garch_alpha", "garch_LR",
-                 "vol_cv", "cpca_roi_c1_env_cv"]
+                 "vol_cv"]
 SHORT = {"dcc_a": "DCC a", "dcc_LR": "DCC LR", "corr_fluct": "Corr. fluct.",
-         "garch_alpha": "GARCH α", "garch_LR": "GARCH LR", "vol_cv": "Volatility CV",
-         "cpca_roi_c1_env_cv": "Envelope CV, C1"}
+         "garch_alpha": "GARCH α", "garch_LR": "GARCH LR", "vol_cv": "Volatility CV"}
 COVARIATES = {
     "mean_FD": "Mean FD", "max_FD": "Max FD", "prop_FD_over_0.05": "FD > 0.05 (prop.)",
     "kurt_roi": "Kurtosis, ROIs", "kurt_gs": "Kurtosis, global signal",
@@ -458,7 +463,7 @@ def main():
     # C: calibrated effect in low vs high halves (DCC and GARCH measures)
     ax = fig.add_subplot(gs[1, 0])
     splits = [c for c in SPLIT_COVARIATES if c in per]
-    show = [t for t in ["dcc_LR", "corr_fluct", "garch_LR", "cpca_roi_c1_env_cv"] if t in tests]
+    show = [t for t in ["dcc_LR", "corr_fluct", "garch_LR"] if t in tests]
     ypos, labels = [], []
     y0 = 0
     for c in splits:

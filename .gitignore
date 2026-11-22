@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.DS_Store
+*.swp
+# outputs and local data are never part of the repository
+results_local/

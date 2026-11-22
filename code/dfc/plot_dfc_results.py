@@ -13,7 +13,7 @@ the same order, the same box/point styling and per-axis text sizes. Group
 statistics follow the rest of the study and use the same module
 (welch_tests_scipy.py, SciPy >= 1.16): Welch ANOVA across the 7 groups with
 permutation p (scipy permutation_test of f_oneway(equal_var=False); Holm
-across the panels of a figure, shown in each title), and the same 8 planned
+across the panels of a figure; a panel title shows p only if p < 0.05), and the same 8 planned
 contrasts as ordinary two-sided Welch t tests (scipy ttest_ind,
 equal_var=False) with pooled BH-FDR. Corrections: statsmodels multipletests.
 
@@ -27,9 +27,11 @@ Inputs (all written by run_dcc_cpca_null.m into one folder)
     pca_explained.csv, dfc_config.txt
 
 Figures (in --out_dir; PDF with editable text, PNG, optional TIFF)
-    Fig_dfc_nonstationarity    calibrated test: observed vs replica z (A),
-                               median difference with 95% CI (B)
-    Fig_dfc_group_z            z by group, 3 x 3 grid in Figure 6 layout
+    Fig_dfc_nonstationarity    z vs own phase surrogates, with the stationary
+                               replica as a bias check (A); median z with 95% CI (B)
+                               (--primary_test calibrated: median z_obs - z_replica)
+    Fig_dfc_group_z            z by group, 2 x 3 grid (DCC, GARCH) in Figure 6 layout
+    FigS_dfc_group_raw         the same in natural units (observed estimates)
     Fig_cpca_propagation_roi   complex PCA: loadings (polar), lags, cycle
     Fig_cpca_static_by_group   static cPCA measures by group (descriptive)
     FigS_cpca_propagation_pca  same as above for the PCA-25 space
@@ -56,6 +58,7 @@ Usage
 
 import argparse
 import os
+import re
 import warnings
 
 import numpy as np
@@ -106,19 +109,32 @@ N_BOOTSTRAP = 10000
 RANDOM_SEED = 20260920
 ALPHA = 0.05
 
-# Pre-specified non-stationarity measures (calibrated test; Holm family).
+# Measures removed from the paper (not part of the published complex_pca
+# outputs): complex-PCA envelope CV and lag index. Any metric whose name
+# contains one of these is dropped from every figure and table.
+EXCLUDED_MEASURES = ("env_cv", "lag_index")
+
+# Pre-specified non-stationarity measures (Holm family).
 PRIMARY_TESTS = ["dcc_a", "dcc_LR", "corr_fluct",
-                 "garch_alpha", "garch_LR", "vol_cv",
-                 "cpca_roi_c1_env_cv"]
+                 "garch_alpha", "garch_LR", "vol_cv"]
+
+# Decision rule for Fig_dfc_nonstationarity and Table S-A (decided 10 Nov 2026).
+#   "uncalibrated": one-sided Wilcoxon signed-rank test that each mouse's z against
+#                   its own phase surrogates is > 0 across mice (published surrogate
+#                   test; primary).
+#   "calibrated":   the same test on z_observed - z_replica (the pre-specified rule;
+#                   reported as a supplementary check whenever replicas exist).
+PRIMARY_RULE = "uncalibrated"
 
 # Figure 6-style grid of z by group: rows x columns.
 GROUP_Z_GRID = [["dcc_a", "dcc_LR", "corr_fluct"],
-                ["garch_alpha", "garch_LR", "vol_cv"],
-                ["cpca_roi_c1_env_cv", "cpca_roi_c2_env_cv", "cpca_roi_c3_env_cv"]]
+                ["garch_alpha", "garch_LR", "vol_cv"]]
 
 # Static complex-PCA measures by group (observed values, not z).
-STATIC_GRID = [["cpca_roi_c1_var_expl", "cpca_roi_c2_var_expl", "cpca_roi_c3_var_expl"],
-               ["cpca_roi_c1_freq_hz", "cpca_roi_lag_index", None]]
+# 2 x 2 (11 Nov 2026): the earlier 2 x 3 grid left two empty cells. Panel order,
+# and so the Holm family and the jitter draws, are unchanged.
+STATIC_GRID = [["cpca_roi_c1_var_expl", "cpca_roi_c2_var_expl"],
+               ["cpca_roi_c3_var_expl", "cpca_roi_c1_freq_hz"]]
 
 FAMILY = {"dcc": "Coupling (DCC)", "garch": "Amplitude (GARCH)",
           "cpca": "Propagation (complex PCA)"}
@@ -319,6 +335,11 @@ def fmt_p(p, n_perm=None):
 def p_text(p, n_perm=None):
     s = fmt_p(p, n_perm)
     return "p" + s if s.startswith("<") else "p=" + s
+
+
+def sig_title(p, n_perm=None):
+    """Group-figure panel title: the Holm p if it is below ALPHA, otherwise blank."""
+    return p_text(p, n_perm) if pd.notna(p) and p < ALPHA else ""
 
 
 def planned_pairs(groups_present):
@@ -564,41 +585,56 @@ def pad_y(ax, values, lower=0.07, upper=0.12):
 
 
 # ============================================================
-# FIGURE 1: calibrated non-stationarity test
+# FIGURE 1: non-stationarity test
 # ============================================================
-def fig_nonstationarity(D, out_dir, formats, n_boot):
+def wilcoxon_greater(x):
+    """One-sided Wilcoxon signed-rank p that the median of x is > 0."""
+    from scipy.stats import wilcoxon
+    x = np.asarray(x, float)
+    x = x[np.isfinite(x)]
+    if x.size < 5 or np.all(x == 0):
+        return np.nan
+    return float(wilcoxon(x, alternative="greater").pvalue)
+
+
+def fig_nonstationarity(D, out_dir, formats, n_boot, rule=PRIMARY_RULE):
     d = D["sub"]
     tests = [m for m in pd.unique(d.loc[d.role == "test", "metric"])]
     prim = [m for m in PRIMARY_TESTS if m in tests]
     expl = [m for m in tests if m not in prim]
-    calibrated = d.loc[d.role == "test", "phase_replica_z"].notna().any()
-    cal = D["cal"].set_index("metric") if (calibrated and D["cal"] is not None) else None
-    gt = D["gt"]
+    has_rep = bool(d.loc[d.role == "test", "phase_replica_z"].notna().any())
+    calibrated = has_rep and rule == "calibrated"
+    cal = D["cal"].set_index("metric") if (has_rep and D["cal"] is not None) else None
     rows = []
     for i, m in enumerate(prim + expl):
         sub = d[d.metric == m]
         zo = sub.phase_z.to_numpy(float)
         zr = sub.phase_replica_z.to_numpy(float)
-        diff = zo - zr if calibrated else zo
+        dd = zo - zr
+        p_unc = wilcoxon_greater(zo)
+        p_cal = (float(cal.loc[m, "wilcoxon_p_greater"]) if (cal is not None and m in cal.index)
+                 else (wilcoxon_greater(dd) if has_rep else np.nan))
+        diff = dd if calibrated else zo
         med, lo, hi = median_ci(diff, n_boot, RANDOM_SEED + i)
-        if cal is not None and m in cal.index:
-            p = float(cal.loc[m, "wilcoxon_p_greater"])
-        elif gt is not None:
-            r = gt[(gt.metric == m) & (gt.null == "phase")]
-            p = float(r.wilcoxon_p_greater.iloc[0]) if len(r) else np.nan
-        else:
-            p = np.nan
+        md, dlo, dhi = (median_ci(dd, n_boot, RANDOM_SEED + i) if has_rep
+                        else (np.nan, np.nan, np.nan))
         rows.append(dict(metric=m, label=long_label(m), family=FAMILY[family_of(m)],
                          prespecified=m in prim, n=int(np.isfinite(diff).sum()),
                          median_z_observed=np.nanmedian(zo),
-                         median_z_replica=np.nanmedian(zr) if calibrated else np.nan,
+                         median_z_replica=np.nanmedian(zr) if has_rep else np.nan,
                          median_difference=med, ci_low=lo, ci_high=hi,
-                         p_wilcoxon_greater=p))
+                         p_wilcoxon_greater=p_cal if calibrated else p_unc,
+                         p_uncalibrated=p_unc, median_d=md, d_ci_low=dlo, d_ci_high=dhi,
+                         p_calibrated=p_cal))
     T = pd.DataFrame(rows)
     T["p_Holm_prespecified"] = np.nan
     T.loc[T.prespecified, "p_Holm_prespecified"] = holm(T.loc[T.prespecified, "p_wilcoxon_greater"])
+    T["p_Holm_calibrated"] = np.nan
+    if has_rep:
+        T.loc[T.prespecified, "p_Holm_calibrated"] = holm(T.loc[T.prespecified, "p_calibrated"])
+    T["rule"] = "calibrated" if calibrated else "uncalibrated"
     T["test"] = ("one-sided Wilcoxon on z_observed - z_replica" if calibrated
-                 else "one-sided Wilcoxon on observed - surrogate mean (UNCALIBRATED)")
+                 else "one-sided Wilcoxon signed-rank on z vs own phase surrogates (median > 0)")
 
     fig = plt.figure(figsize=(8.0, 3.9))
     gs = fig.add_gridspec(1, 2, width_ratios=[1.35, 1.0], wspace=0.95)
@@ -609,8 +645,8 @@ def fig_nonstationarity(D, out_dir, formats, n_boot):
     allz = []
     for i, m in enumerate(prim):
         sub = d[d.metric == m]
-        series = [(-0.19 if calibrated else 0.0, sub.phase_z.to_numpy(float), "white", INK)]
-        if calibrated:
+        series = [(-0.19 if has_rep else 0.0, sub.phase_z.to_numpy(float), "white", INK)]
+        if has_rep:
             series.append((0.19, sub.phase_replica_z.to_numpy(float), REPLICA_FILL, MUTED))
         for off, v, face, pc in series:
             v = v[np.isfinite(v)]
@@ -650,9 +686,9 @@ def fig_nonstationarity(D, out_dir, formats, n_boot):
         ax.text((a + b - 1) / 2, 0.985, name, transform=tr, ha="center",
                 va="top", fontsize=8, color=SECONDARY)
     handles = [Patch(facecolor="white", edgecolor=SECONDARY, label="Observed")]
-    if calibrated:
+    if has_rep:
         handles.append(Patch(facecolor=REPLICA_FILL, edgecolor=SECONDARY,
-                             label="Stationary replica"))
+                             label="Stationary replica" + ("" if calibrated else " (bias check)")))
     ax.legend(handles=handles, loc="lower left", frameon=False, fontsize=7.5,
               bbox_to_anchor=(0.0, 1.0), ncol=2, handlelength=1.2,
               borderaxespad=0.2)
@@ -692,18 +728,18 @@ def fig_nonstationarity(D, out_dir, formats, n_boot):
             fontsize=6.5, color=SECONDARY, va="center")
     ax.set_ylim(y.min() - 0.7, y.max() + 1.3)
     xl = ("Median z$_{observed}$ − z$_{replica}$ (95% CI)" if calibrated
-          else "Median z vs surrogates (95% CI)")
+          else "Median z vs own phase surrogates (95% CI)")
     ax.set_xlabel(xl, fontsize=9)
     ax.tick_params(axis="x", labelsize=8)
     if use_symlog(T[["ci_low", "ci_high"]].to_numpy()):
         symlog_axis(ax, "x", 1)
     sns.despine(ax=ax)
     panel_label(ax, "B", x=-0.62, y=1.0)
-    if not calibrated:
-        fig.suptitle("UNCALIBRATED: no stationary-replica z in this run", color="#e34948",
-                     fontsize=9, y=1.02)
+    if rule == "calibrated" and not has_rep:
+        fig.suptitle("Calibrated test requested, but this run has no stationary replicas",
+                     color="#e34948", fontsize=9, y=1.02)
     save(fig, out_dir, "Fig_dfc_nonstationarity", formats)
-    return T, calibrated
+    return T, calibrated, has_rep
 
 
 # ============================================================
@@ -737,11 +773,53 @@ def fig_group_z(D, out_dir, formats, groups, palette, n_perm):
             if use_symlog(sub.phase_z):
                 symlog_axis(ax, "y", 2)
             p = omni.loc[omni.metric == m, "p_Holm"].iloc[0]
-            format_group_axis(ax, groups, f"{FAMILY[family_of(m)]}; {p_text(p, n_perm)}",
-                              f"{long_label(m)} (z)")
+            format_group_axis(ax, groups, sig_title(p, n_perm), f"{long_label(m)} (z)")
             pad_y(ax, np.r_[sub.phase_z.to_numpy(float), rep])
     save(fig, out_dir, "Fig_dfc_group_z", formats)
     return omni, cons
+
+
+def surrogate_mean_column(d):
+    """Column holding each mouse's mean over its phase surrogates, if the run wrote one."""
+    for c in d.columns:
+        if re.search(r"phase", c) and re.search(r"surr|null", c) and re.search(r"mean", c):
+            return c
+    return None
+
+
+def fig_group_raw(D, out_dir, formats, groups, palette, n_perm):
+    """Fig_dfc_group_z in natural units: each mouse's observed estimate."""
+    d = D["sub"]
+    grid = [[m for m in row if m in set(d.metric)] for row in GROUP_Z_GRID]
+    grid = [r for r in grid if r]
+    metrics = [m for r in grid for m in r]
+    omni, cons = group_tests(d, metrics, "observed", groups, "FigS_dfc_group_raw", n_perm)
+    sc = surrogate_mean_column(d)
+    ncol = max(len(r) for r in grid)
+    fig, axes = plt.subplots(len(grid), ncol, figsize=(PANEL_SIZE * ncol, PANEL_SIZE * len(grid)),
+                             constrained_layout=True, squeeze=False)
+    rng = np.random.default_rng(RANDOM_SEED)
+    for r, row in enumerate(grid):
+        for c in range(ncol):
+            ax = axes[r, c]
+            if c >= len(row):
+                ax.axis("off")
+                continue
+            m = row[c]
+            sub = d[d.metric == m]
+            ref = sub[sc].to_numpy(float) if sc else np.array([])
+            ref = ref[np.isfinite(ref)]
+            if ref.size >= 10:
+                lo, hi = np.percentile(ref, [2.5, 97.5])
+                ax.axhspan(lo, hi, color=GRID, alpha=0.7, lw=0, zorder=0)
+            box_strip(ax, sub, "observed", groups, palette, rng)
+            if use_symlog(sub.observed):
+                symlog_axis(ax, "y", 2)
+            p = omni.loc[omni.metric == m, "p_Holm"].iloc[0]
+            format_group_axis(ax, groups, sig_title(p, n_perm), long_label(m))
+            pad_y(ax, np.r_[sub.observed.to_numpy(float), ref])
+    save(fig, out_dir, "FigS_dfc_group_raw", formats)
+    return omni, cons, sc
 
 
 # ============================================================
@@ -927,7 +1005,7 @@ def fig_static(D, out_dir, formats, groups, palette, n_perm, adjusted):
             lab = long_label(m.replace("_adj", ""))
             if "lag_index" in m:
                 lab += " (adjusted)" if m.endswith("_adj") else " (unadjusted)"
-            format_group_axis(ax, groups, f"Static; {p_text(p, n_perm)}", lab)
+            format_group_axis(ax, groups, sig_title(p, n_perm), lab)
             pad_y(ax, sub.observed)
     save(fig, out_dir, "Fig_cpca_static_by_group", formats)
     return omni, cons
@@ -1187,19 +1265,35 @@ def write_docx(path, T1, omni, cons, static_tab, notes):
         n.paragraph_format.space_before = Pt(3)
         doc.add_paragraph()
 
-    tA = pd.DataFrame({
+    calibrated = T1.rule.iloc[0] == "calibrated"
+    has_rep = bool(T1.median_z_replica.notna().any())
+    dash = lambda f: (lambda v: "—" if not np.isfinite(v) else f(v))
+    ci = lambda a, b, c: "—" if not np.isfinite(a) else f"{a:.2f} [{b:.2f}, {c:.2f}]"
+    cols = {
         "Measure": T1.label,
         "Family": T1.family,
         "Pre-specified": np.where(T1.prespecified, "yes", "exploratory"),
         "n": T1.n,
-        "Median z (observed)": T1.median_z_observed.map("{:.2f}".format),
-        "Median z (replica)": T1.median_z_replica.map(lambda v: "—" if not np.isfinite(v) else f"{v:.2f}"),
-        "Median difference [95% CI]": [f"{a:.2f} [{b:.2f}, {c:.2f}]" for a, b, c in
-                                       zip(T1.median_difference, T1.ci_low, T1.ci_high)],
-        "p": T1.p_wilcoxon_greater.map(fmt_p),
-        "p (Holm)": T1.p_Holm_prespecified.map(lambda v: "—" if not np.isfinite(v) else fmt_p(v)),
-    })
-    add_table("Table S-A. Calibrated test of non-stationarity (phase null).", tA, notes["A"])
+    }
+    if calibrated:
+        cols["Median z (observed)"] = T1.median_z_observed.map("{:.2f}".format)
+        cols["Median z (replica)"] = T1.median_z_replica.map(dash(lambda v: f"{v:.2f}"))
+        cols["Median d [95% CI]"] = [ci(a, b, c) for a, b, c in
+                                     zip(T1.median_difference, T1.ci_low, T1.ci_high)]
+    else:
+        cols["Median z [95% CI]"] = [ci(a, b, c) for a, b, c in
+                                     zip(T1.median_difference, T1.ci_low, T1.ci_high)]
+    cols["p"] = T1.p_wilcoxon_greater.map(fmt_p)
+    cols["p (Holm)"] = T1.p_Holm_prespecified.map(dash(fmt_p))
+    if has_rep and not calibrated:
+        cols["Replica z (median)"] = T1.median_z_replica.map(dash(lambda v: f"{v:.2f}"))
+        cols["Calibrated d [95% CI]"] = [ci(a, b, c) for a, b, c in
+                                         zip(T1.median_d, T1.d_ci_low, T1.d_ci_high)]
+        cols["p calibrated (Holm)"] = T1.p_Holm_calibrated.map(dash(fmt_p))
+    tA = pd.DataFrame(cols)
+    add_table("Table S-A. Test of non-stationarity: " + (
+        "calibrated against stationary replicas (phase null)." if calibrated else
+        "z against each mouse's own phase surrogates."), tA, notes["A"])
 
     tB = pd.DataFrame({
         "Figure": omni.figure.str.replace("Fig_", ""),
@@ -1251,6 +1345,8 @@ def main():
     ap.add_argument("--formats", nargs="+", default=["pdf", "png"])
     ap.add_argument("--n_perm", type=int, default=N_PERMUTATIONS)
     ap.add_argument("--n_boot", type=int, default=N_BOOTSTRAP)
+    ap.add_argument("--primary_test", choices=["uncalibrated", "calibrated"],
+                    default=PRIMARY_RULE, help="decision rule for Fig_dfc_nonstationarity")
     args = ap.parse_args()
     out = args.out_dir or os.path.join(args.in_dir, "figures")
     os.makedirs(out, exist_ok=True)
@@ -1269,10 +1365,19 @@ def main():
           f"n_replica={cfg.get('n_replica', '0')}, pca_dim={cfg.get('pca_dim', '?')}, "
           f"dcc_decimate={cfg.get('dcc_decimate', '?')}")
     D["sub"], adjusted = add_adjusted_lag(d, args.lag_covariate)
+    drop = D["sub"].metric.str.contains("|".join(EXCLUDED_MEASURES))
+    if drop.any():
+        print(f"  removed {D['sub'].loc[drop, 'metric'].nunique()} excluded measure(s): "
+              + ", ".join(sorted(D["sub"].loc[drop, "metric"].unique())))
+    D["sub"] = D["sub"][~drop].reset_index(drop=True)
 
     print("Figures:")
-    T1, calibrated = fig_nonstationarity(D, out, args.formats, args.n_boot)
+    T1, calibrated, has_rep = fig_nonstationarity(D, out, args.formats, args.n_boot,
+                                                  args.primary_test)
     omni_z, cons_z = fig_group_z(D, out, args.formats, groups, palette, args.n_perm)
+    omni_r, cons_r, surr_col = fig_group_raw(D, out, args.formats, groups, palette, args.n_perm)
+    print(f"  FigS_dfc_group_raw reference band from column: {surr_col}" if surr_col else
+          "  FigS_dfc_group_raw: no per-mouse surrogate-mean column found; no reference band")
     fig_cpca(D, out, args.formats, "roi", "Fig_cpca_propagation_roi", names)
     omni_s, cons_s = fig_static(D, out, args.formats, groups, palette, args.n_perm, adjusted)
     fig_cpca(D, out, args.formats, "pca", "FigS_cpca_propagation_pca", names)
@@ -1280,10 +1385,10 @@ def main():
     frac = fig_null_agreement(D, out, args.formats)
     fig_checks(D, out, args.formats)
 
-    omni = pd.concat([omni_z, omni_s], ignore_index=True)
-    cons = pd.concat([cons_z, cons_s], ignore_index=True)
+    omni = pd.concat([omni_z, omni_r, omni_s], ignore_index=True)
+    cons = pd.concat([cons_z, cons_r, cons_s], ignore_index=True)
     static_tab = static_descriptives(D, groups, adjusted)
-    T1.to_csv(os.path.join(out, "table_calibrated_test.csv"), index=False)
+    T1.to_csv(os.path.join(out, "table_nonstationarity_test.csv"), index=False)
     omni.to_csv(os.path.join(out, "table_group_omnibus.csv"), index=False)
     cons.to_csv(os.path.join(out, "table_group_contrasts_all.csv"), index=False)
     static_tab.to_csv(os.path.join(out, "table_static_by_group.csv"), index=False)
@@ -1302,56 +1407,122 @@ def main():
     fam = "pooled across all contrasts and measures of a figure" if FDR_POOL == "family" \
         else "across the planned contrasts of each measure"
     prim_rows = T1[T1.prespecified]
+    pdim, tr, dec = cfg.get("pca_dim", "25"), cfg.get("TR", "?"), cfg.get("dcc_decimate", "1")
+    n_boot, n_perm = args.n_boot, args.n_perm
+    n_groups, n_contr = len(groups), len(PAIRWISE_COMPARISONS)
     notes = {
         "A": ("z: (observed − mean of the mouse's own phase-randomised surrogates) / SD of the "
               "surrogates. " + (rep_note + " p: one-sided Wilcoxon signed-rank test that "
                                 "z_observed − z_replica > 0 across mice. " if calibrated else
-                                "UNCALIBRATED run (no replica): p is the one-sided Wilcoxon on "
-                                "observed − surrogate mean. ") +
+                                "p: one-sided Wilcoxon signed-rank test that the median z > 0 across "
+                                "mice (surrogate-data test; Theiler et al., 1992). "
+                                + (rep_note + " The replica z estimates the bias of the surrogate "
+                                   "procedure on stationary data; the calibrated difference "
+                                   "z_observed − z_replica is given as a supplementary check. "
+                                   if has_rep else "")) +
               f"Holm correction across the {int(T1.prespecified.sum())} pre-specified measures. "
               f"95% CI: percentile bootstrap of the median ({args.n_boot} resamples). DCC measures "
               "are tested against the phase null only (IAAFT is not a valid null for DCC on "
               "band-limited data)."),
         "B": (f"Welch ANOVA across groups; p from {args.n_perm} permutations of group labels; "
-              "Holm correction across the panels of each figure (as shown in panel titles). "
+              "Holm correction across the panels of each figure; panel titles show this p only "
+              "when it is below 0.05. "
               "Group comparisons of non-stationarity use z, so any bias common to all mice cancels."),
         "C": ("Ordinary two-sided Welch t tests (Welch–Satterthwaite df); Benjamini–Hochberg "
               f"FDR {fam}. Complete results: table_group_contrasts_all.csv."
               + ("" if len(cons[cons.q_BH < ALPHA]) else " No planned contrast reached q < 0.05.")),
         "D": ("Static measures describe stationary lagged coupling (phase randomisation preserves "
               "variance explained and frequency exactly); they are for group comparison only, not "
-              "evidence of dynamics. The lag index is a split-half estimate; "
-              + ("it is adjusted for each mouse's coupling magnitude (RMS |complex coherence| "
-                 "over all ROI pairs, split-half), which is lag-invariant." if adjusted else
-                 "it is shown unadjusted here; group comparisons should adjust for coupling "
-                 "magnitude (compute_lag_covariate.py), not zero-lag FC strength.")),
+              "evidence of dynamics."),
         "figs": [
-            "Fig_dfc_nonstationarity. (A) Per-mouse z of each pre-specified non-stationarity measure "
-            "against the mouse's own phase-randomised surrogates (white boxes) and the same "
-            "procedure applied to a stationary replica of each mouse (grey boxes); p above each "
-            "pair: one-sided Wilcoxon on z_observed − z_replica. (B) Median difference with 95% "
-            "bootstrap CI for all measures; filled markers pre-specified, open markers exploratory; "
-            "p (Holm across pre-specified measures). "
+            "Fig_dfc_nonstationarity. Test for non-stationary coupling and amplitude. "
+            f"DCC and GARCH models were fitted to each mouse's group-PCA component time series "
+            f"(PCA-{pdim}; TR = {tr} s; decimation factor {dec}), and each measure was expressed as "
+            f"z = (observed − mean of {n_surr} phase-randomised surrogates of the same mouse) / SD of "
+            "those surrogates. Phase randomisation keeps each series' power spectrum and the "
+            "cross-spectra between series, so the surrogates have the same static FC but no "
+            "dynamics. "
+            + (rep_note + " " if has_rep else "") +
+            "(A) Per-mouse z for each pre-specified measure, grouped by model family (DCC: "
+            "coupling; GARCH: amplitude). White boxes: observed data"
+            + ("; grey boxes: stationary replicas" if has_rep else "") +
+            ". Boxes: median and IQR; whiskers: 1.5 × IQR; points: individual mice; "
+            "horizontal line: z = 0 (no difference from surrogates). "
+            + ("A replica z away from 0 shows the bias of the surrogate procedure itself on "
+               "stationary data. " if has_rep else "")
+            + ("(B) Median of z_observed − z_replica across mice" if calibrated
+               else "(B) Median z across mice")
+            + f" with 95% percentile bootstrap CI ({n_boot} resamples). Filled markers: "
+            "pre-specified measures; open markers: exploratory measures (not corrected). Text at "
+            "right: one-sided Wilcoxon signed-rank p"
+            + (" on z_observed − z_replica" if calibrated else " that the median z > 0")
+            + ", with the Holm-adjusted p across the pre-specified measures in parentheses. "
             + (f"Pre-specified measures: p = {', '.join(fmt_p(v) for v in prim_rows.p_wilcoxon_greater)} "
                f"(n = {int(prim_rows.n.max()) if len(prim_rows) else 0} mice)." if len(prim_rows) else ""),
-            "Fig_dfc_group_z. z by group for each measure (boxes: median and IQR; whiskers 1.5 IQR; "
-            "points: mice). Grey band: central 95% of stationary-replica z across all mice (the "
-            "stationary reference); line: z = 0. Title p: Welch ANOVA, permutation, Holm across panels.",
-            "Fig_cpca_propagation_roi. Group complex PCA in ROI space. Left: complex loadings "
-            "(angle = phase relative to the largest-loading ROI, radius = magnitude; positive phase "
-            "= later). Middle: lag (s) = phase / (2π × component frequency), ROIs sorted; marker size "
-            "∝ |loading|. Right: one propagation cycle, mean standardised BOLD in 20 bins of the "
-            "component's phase, ROIs sorted by phase (earliest at top); the strip gives |loading|.",
-            "Fig_cpca_static_by_group. Static complex-PCA measures by group; title p: Welch ANOVA, "
-            "permutation, Holm across panels. Descriptive of stationary lagged coupling.",
-            "FigS_dfc_null_agreement. (A) Per-mouse z under the phase and IAAFT nulls (measures "
-            "for which both nulls are valid). (B) Fraction of mice with p ≤ 0.05 against their own "
-            f"surrogates ({n_surr} per null: p ≤ 0.05 means the observed value exceeded every "
-            "surrogate); line: 0.05 expected under the null, band: central 95% binomial range.",
-            "FigS_pca_cpca_checks. (A) Group PCA variance. (B) Complex PCA variance in ROI and PCA-25 "
-            "space; open markers: refit on IAAFT surrogates (phase surrogates reproduce the fit "
-            "exactly). (C) Similarity |⟨v_ROI, v_PCA⟩| between ROI-space components and PCA-space "
-            "components mapped back to ROIs.",
+            "Fig_dfc_group_z. Non-stationarity measures by group. Each panel shows one measure's "
+            f"per-mouse z against its own phase surrogates (definition as in Fig_dfc_nonstationarity) "
+            f"for the {n_groups} groups (n = {n_sub} mice in total). Boxes: median and IQR; whiskers: "
+            "1.5 × IQR; points: individual mice in the group colour. Grey band: central 95% of "
+            "stationary-replica z pooled across all mice, i.e. the range expected without dynamics; "
+            "line: z = 0. A p value above a panel is the omnibus test (Welch ANOVA across groups "
+            f"with p from {n_perm} permutations of group labels, Holm-corrected across the panels "
+            "of the figure) and is shown only when p < 0.05; all p values are in Table S-B. Using z rather than raw values means any bias shared by all "
+            f"mice cancels in group comparisons. The {n_contr} planned contrasts are in Table S-C.",
+            "FigS_dfc_group_raw. As Fig_dfc_group_z, in natural units: each mouse's observed DCC "
+            "and GARCH estimate (mean of the odd- and even-volume estimates), for comparison with "
+            "published values. "
+            + ("Grey band: central 95% of the mice's phase-surrogate means, i.e. the values "
+               "expected without dynamics. " if surr_col else
+               "No reference band: this run wrote no per-mouse surrogate mean. ") +
+            "Raw values also differ between mice for reasons unrelated to dynamics (spectra, "
+            "signal-to-noise, static FC), which the z in Fig_dfc_group_z removes, so group "
+            "differences here are descriptive. Boxes, whiskers, points and title p as in "
+            "Fig_dfc_group_z.",
+            "Fig_cpca_propagation_roi. Group complex PCA in ROI space (Bolt et al. 2022). Each "
+            "ROI's band-limited signal was made complex with the Hilbert transform, and PCA of "
+            "the concatenated complex series gives, per component, a complex loading for each ROI: "
+            "its magnitude is how strongly the ROI takes part, its phase is when within the "
+            "component's cycle it peaks. One row per component; the row header gives the share of "
+            "analytic variance and the median frequency (and period). Left: polar plot of the "
+            "loadings (angle = phase relative to the largest-loading ROI; radius = magnitude; "
+            "positive phase = later); the three largest-loading ROIs are named. Loadings clustered "
+            "at 0 and π indicate a standing (zero-lag) pattern; a spread of phases indicates "
+            "propagation. Middle: lag in seconds, phase / (2π × component frequency), with ROIs "
+            "sorted from earliest to latest; black: |loading| ≥ median, grey: below median; marker "
+            "size ∝ |loading|; the earliest and latest strong ROIs are named. Right: one "
+            "propagation cycle, the mean standardised BOLD signal in 20 bins of the component's "
+            "phase, with ROIs sorted by phase (earliest at top); the narrow strip gives each ROI's "
+            "|loading|. Red: above the ROI's mean; blue: below.",
+            "Fig_cpca_static_by_group. Time-averaged complex-PCA measures by group: per-mouse "
+            "variance explained by each of the group components (%) and the frequency of "
+            "component 1 (Hz). Boxes, whiskers and points as in Fig_dfc_group_z. p above a panel: "
+            f"Welch ANOVA with permutation p ({n_perm} permutations), Holm-corrected across panels, "
+            "shown only when p < 0.05 (all p values in Table S-B). "
+            "Phase randomisation preserves these measures exactly, so they describe stationary "
+            "(lagged) coupling and are compared between groups only; they are not evidence of "
+            "dynamics. Medians and IQRs are in Table S-D.",
+            "FigS_cpca_propagation_pca. As Fig_cpca_propagation_roi, for complex PCA run in the "
+            f"PCA-{pdim} space and mapped back to ROIs, to check that the propagation patterns do "
+            "not depend on the space used.",
+            "FigS_cpca_roi_lags. Lag of every ROI for each complex component, in seconds (phase / "
+            "(2π × component frequency)), sorted from earliest (top) to latest and labelled with "
+            "the ROI name. Black bars: |loading| ≥ median; grey bars: below median, whose lags are "
+            "less reliable.",
+            "FigS_dfc_null_agreement. Agreement between the two surrogate nulls for the measures "
+            "where both are valid (IAAFT is not a valid null for DCC on band-limited data, so DCC "
+            "measures are excluded from A). (A) Per-mouse z under phase randomisation (x) and "
+            "IAAFT (y), which additionally keeps each ROI's value distribution; diagonal: identity; "
+            "ρ: Spearman correlation. (B) Fraction of mice whose observed value exceeded all of "
+            f"their own surrogates ({n_surr} per null, so p ≤ 0.05), for each measure and null. "
+            "Line: 0.05, the fraction expected if no mouse departed from its null; grey band: "
+            "central 95% binomial range for that fraction.",
+            f"FigS_pca_cpca_checks. (A) Group PCA: variance explained per component (bars) and "
+            f"cumulative (line) for the {pdim} components retained for DCC/GARCH. (B) Share of "
+            f"analytic variance per complex component in ROI space and PCA-{pdim} space (filled "
+            "markers); open markers: the same complex PCA refitted on IAAFT surrogates (phase "
+            "surrogates reproduce the fit exactly, so they are not shown). (C) Similarity "
+            "|⟨v_ROI, v_PCA⟩| between the ROI-space components and the PCA-space components mapped "
+            "back to ROIs (1 = identical pattern).",
         ],
     }
     try:
@@ -1359,9 +1530,13 @@ def main():
     except ImportError:
         print("python-docx not installed; wrote CSV tables only (pip install python-docx).")
 
-    print("\nCalibrated test (pre-specified):" if calibrated else "\nUNCALIBRATED test:")
+    print("\nCalibrated test:" if calibrated else "\nSurrogate test (z vs own phase surrogates):")
     print(T1[["metric", "n", "median_difference", "ci_low", "ci_high",
               "p_wilcoxon_greater", "p_Holm_prespecified"]].to_string(index=False))
+    if has_rep and not calibrated:
+        print("\nSupplementary calibrated check (z_observed - z_replica):")
+        print(T1[["metric", "median_z_replica", "median_d", "d_ci_low", "d_ci_high",
+                  "p_calibrated", "p_Holm_calibrated"]].to_string(index=False))
     print("\nGroup omnibus:")
     print(omni[["figure", "metric", "welch_F", "p_perm", "p_Holm"]].to_string(index=False))
     print(f"\nPlanned contrasts with q < {ALPHA}: {int((cons.q_BH < ALPHA).sum()) if len(cons) else 0}")

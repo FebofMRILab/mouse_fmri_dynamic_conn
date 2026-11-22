@@ -72,11 +72,11 @@ Output goes to `static_test_results/`. The same job also tests `hmm_py/` (about 
 
 The two jobs are independent and can run at the same time (2 cores in total).
 
-## 3. The two reported models: ten fits each, the selection rule, then the pipeline
+## 3. The reported model: ten fits, the selection rule, then the pipeline
 
-Two models are reported (`hmm_v2/FIT_SELECTION_RULE.md`, amendment 1 of 27 Oct 2026; provenance D33), each set in one file and loaded by `reported_model.sh`:
-- **primary** (`hmm_v2/MODEL_PRIMARY.env`): Gaussian HMM on 25 PCs, K = 3, in `<signals>/hmm_k3_pca25_fits/`;
-- **secondary** (`hmm_v2/MODEL_SECONDARY.env`): HMM-PCA rank 15, K = 2, in `<signals>/hmm_k2_hmmpca15_fits/`.
+The paper reports one model, the **primary** (`hmm_v2/MODEL_PRIMARY.env`): Gaussian HMM on 25 PCs, K = 3, in `<signals>/hmm_k3_pca25_fits/`. It is set in one file and loaded by `reported_model.sh`.
+
+The **secondary** model (`hmm_v2/MODEL_SECONDARY.env`: HMM-PCA rank 15, K = 2, in `<signals>/hmm_k2_hmmpca15_fits/`) was run during development and is not reported in the paper. Its commands below are optional. (The rule is `hmm_v2/FIT_SELECTION_RULE.md`, amendment 1 of 27 Oct 2026.)
 
 **Do not edit the rule or the model files after step 3a is submitted.** The array job records the rule's SHA-256 and copies the model file, both into the fits folder (`rule_sha256.txt`, `model.env`) and per role into `<signals>/hmm_fits_<role>_model.env`. Every later task, the selection and `run_selected_fit.sh` stop if either has changed.
 

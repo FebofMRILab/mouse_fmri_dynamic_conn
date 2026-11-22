@@ -32,6 +32,13 @@ Usage (one or more datasets; label, folder, number of subjects, TR in s):
         --dataset human_GE3T ../human/hmm_signals 54 3
 Outputs in --out_dir (default signal_rank): signal_rank_per_subject.csv,
 FigS_signal_rank.{pdf,png}
+
+Figure (11 Nov 2026): A, eigenvalue spectrum with both noise references; B,
+signal dimensions by each method. The former panel C (share of variance in the
+signal dimensions) was dropped from the figure; var_signal_pa and
+var_signal_mp are still written to signal_rank_per_subject.csv. With a single
+dataset the dataset name is no longer printed under panel B, and the spectrum
+line is labelled "Median".
 """
 
 import argparse
@@ -176,14 +183,14 @@ def main():
 
     # ---------------- figure ----------------
     labels = list(spectra)
-    fig, axes = plt.subplots(1, 3, figsize=(8.0, 2.9), gridspec_kw=dict(wspace=0.5))
+    fig, axes = plt.subplots(1, 2, figsize=(5.6, 2.9), gridspec_kw=dict(wspace=0.5))
     ax = axes[0]
     for i, lab in enumerate(labels):
         lam, thr, edge, q1, q3 = spectra[lab]
         col = DATASET_COLORS[i % 3]
         k = np.arange(1, lam.size + 1)
         ax.fill_between(k, q1, q3, color=col, alpha=0.18, lw=0)
-        ax.plot(k, lam, "-", color=col, lw=1.3, label=f"{lab} (median)")
+        ax.plot(k, lam, "-", color=col, lw=1.3)
         ax.plot(k, thr, "--", color=col, lw=0.9)
         ax.axhline(edge, color=col, lw=0.7, ls=":")
     ax.set_xlim(0, 40)
@@ -193,7 +200,8 @@ def main():
     ax.set_ylabel("Eigenvalue (correlation matrix)", fontsize=8.5)
     ax.tick_params(labelsize=7)
     from matplotlib.lines import Line2D
-    handles = [Line2D([], [], color=DATASET_COLORS[i % 3], lw=1.3, label=lab)
+    handles = [Line2D([], [], color=DATASET_COLORS[i % 3], lw=1.3,
+                      label=lab if len(labels) > 1 else "Median")
                for i, lab in enumerate(labels)]
     from matplotlib.patches import Patch
     handles += [Patch(facecolor=SECONDARY, alpha=0.18, lw=0, label="IQR across subjects"),
@@ -205,9 +213,7 @@ def main():
     sns.despine(ax=ax)
 
     for ax, col, ylab, title in [
-            (axes[1], ["rank_pa", "rank_mp"], "Signal dimensions", ""),
-            (axes[2], ["var_signal_pa", "var_signal_mp"], "Variance above noise (share)",
-             "")]:
+            (axes[1], ["rank_pa", "rank_mp"], "Signal dimensions", "")]:
         pos = 0
         ticks, ticklabels = [], []
         for i, lab in enumerate(labels):
@@ -224,8 +230,9 @@ def main():
                 ticks.append(pos)
                 ticklabels.append(meth)
                 pos += 1
-            ax.text(pos - 1.5, -0.2, lab, transform=ax.get_xaxis_transform(), ha="center",
-                    va="top", fontsize=7, color=SECONDARY)
+            if len(labels) > 1:                  # name the dataset only when there are several
+                ax.text(pos - 1.5, -0.2, lab, transform=ax.get_xaxis_transform(), ha="center",
+                        va="top", fontsize=7, color=SECONDARY)
             pos += 0.6
         ax.set_xticks(ticks)
         ax.set_xticklabels(ticklabels, fontsize=7)
@@ -233,7 +240,7 @@ def main():
         ax.tick_params(axis="y", labelsize=7)
         ax.set_title(title, fontsize=8, loc="left")
         sns.despine(ax=ax)
-    for ax, letter in zip(axes, "ABC"):
+    for ax, letter in zip(axes, "AB"):
         ax.text(-0.3, 1.08, letter, transform=ax.transAxes, fontsize=11, fontweight="bold")
     for ext in ("pdf", "png"):
         fig.savefig(os.path.join(args.out_dir, f"FigS_signal_rank.{ext}"), bbox_inches="tight",

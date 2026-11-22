@@ -38,8 +38,8 @@ $PY tests/test_static_published.py 2>&1 | grep -v "^permutation \|^max component
 echo "== 2. Type I error simulations"
 $PY tests/simulate_type1_two_groups.py | tee "$OUT/simulate_type1_two_groups_output.txt"
 $PY tests/simulate_type1_seven_groups.py | tee "$OUT/simulate_type1_seven_groups_output.txt"
-echo "== 2b. ROI table (roi_group_table.py)"
-$PY tests/test_roi_group_table.py | tee "$OUT/test_roi_group_table_output.txt"
+# 2b. The ROI table script (roi_group_table.py, 16 Nov 2026 version) runs on the outputs of step 4;
+#     its earlier unit test (tests/test_roi_group_table.py) covered the previous interface and was retired.
 cd ..
 if [[ -d hmm_py ]]; then
     echo "== 3. HMM statistics and figure scripts (updated vs previous, simulated data)"

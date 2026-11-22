@@ -1,7 +1,7 @@
 % Simulated ROI series with known slice-timing offsets, analysed with the
 % pipeline's own dfc_analytic_signal / dfc_cpca_fit / dfc_cpca_subject_stats.
 here = fileparts(mfilename('fullpath'));
-addpath(fullfile(here, '..', '..'));     % dfc/: the pipeline's own functions
+addpath(fullfile(here, '..', '..', '..', 'dfc'));   % dfc/: the pipeline's own functions (test moved to qc/, 21 Nov 2026)
 TR = 2; T = 570; n = 20; M = 20; R = 82; dt = 0.1; pad = 100;
 tf = (0:dt:(T * TR + 2 * pad)).';  Nf = numel(tf);
 fr = (0:Nf - 1).' / (Nf * dt); fr = min(fr, 1 / dt - fr);

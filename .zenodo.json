@@ -1,0 +1,28 @@
+{
+  "title": "mouse_fmri_dynamic_conn: static and dynamic functional connectivity analysis of mouse resting-state fMRI",
+  "upload_type": "software",
+  "description": "Code for static functional connectivity (graph theory, network-based statistic), hidden Markov model states (HMM-MAR) and window-free dynamic functional connectivity (DCC-GARCH, complex PCA) in mouse resting-state fMRI, as used in Grudny, Rodriguez et al., 'Multi-method assessment of functional connectivity in TgCRND8 and 5XFAD mice reveals robust static and hidden Markov state effects of amyloidosis'. The README gives the run order, mapped to the paper's figures.",
+  "creators": [
+    {
+      "name": "Febo, Marcelo",
+      "affiliation": "Department of Psychiatry, University of Florida",
+      "orcid": "0000-0001-8981-4163"
+    }
+  ],
+  "license": "cc0-1.0",
+  "keywords": ["fMRI", "mouse", "functional connectivity", "hidden Markov model", "DCC-GARCH", "complex PCA", "amyloid"],
+  "related_identifiers": [
+    {
+      "identifier": "10.64898/2026.04.26.720907",
+      "relation": "isSupplementTo",
+      "scheme": "doi",
+      "resource_type": "publication-preprint"
+    },
+    {
+      "identifier": "https://openneuro.org/datasets/ds008951",
+      "relation": "references",
+      "scheme": "url",
+      "resource_type": "dataset"
+    }
+  ]
+}
