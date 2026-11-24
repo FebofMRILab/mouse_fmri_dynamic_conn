@@ -7,7 +7,7 @@ Code for static and dynamic functional connectivity (FC) analysis of mouse resti
 > Grudny MM, Rodriguez N, et al. *Multi-method assessment of functional connectivity in TgCRND8 and 5XFAD mice reveals robust static and hidden Markov state effects of amyloidosis.* (eLife, submitted; preprint doi:10.64898/2026.04.26.720907)
 
 **The study's data:**
-- 95 mice in 7 groups (non-transgenic, TgCRND8 and 5XFAD; young, middle-aged and aged)
+- 95 scans from 78 mice in 7 groups (non-transgenic, TgCRND8 and 5XFAD; young, middle-aged and aged). The transgenic mice were scanned at two ages; the non-transgenic mice once
 - 82 ROIs
 - spin-echo EPI at 11.1 T, TR 2 s, 570 volumes after preprocessing
 - the raw BIDS data are on OpenNeuro (ds008951)
@@ -21,10 +21,10 @@ Each analysis is a self-contained package under `code/`. The steps below run the
 
 ## Example data
 
-`code/static_v2/example_files/` holds the static-FC inputs used in the paper for all 95 mice:
+`code/static_v2/example_files/` holds the static-FC inputs used in the paper for all 95 scans:
 - `merged.csv`: 95 stacked 82 × 82 FC matrices from the RABIES-preprocessed OpenNeuro data
 - `roi_names_order.csv`
-- `subject_group_order_mappings.csv`: group of each mouse
+- `subject_group_order_mappings.csv`: group of each scan
 
 To run the static analysis (step 4) on them:
 
@@ -35,10 +35,10 @@ cd static && python ../code/static_v2/full_analysis_abeta_mice_permutation_trans
 
 The full run uses 10,000 permutations and takes about 4 h on one core.
 
-`example_data/hmm_signals.zip` holds the ROI-mean time series of the same 95 mice:
+`example_data/hmm_signals.zip` holds the ROI-mean time series of the same 95 scans:
 - `signal1.txt` … `signal95.txt` (570 volumes × 82 ROIs each)
 - `meta_data.csv` (subject_id, group)
-- `fc_check.csv`: per mouse, the largest difference between the FC of these series and RABIES's FC matrix (about 2 × 10⁻⁷ everywhere)
+- `fc_check.csv`: per scan, the largest difference between the FC of these series and RABIES's FC matrix (about 2 × 10⁻⁷ everywhere)
 
 These are the inputs to steps 6–13. Unzip them into your `signals/` folder (`unzip example_data/hmm_signals.zip -d <study>/signals`). They can also be regenerated from the OpenNeuro data with steps 1–2.
 
@@ -47,7 +47,7 @@ These are the inputs to steps 6–13. Unzip them into your `signals/` folder (`u
 | What | Version used | Needed for |
 |---|---|---|
 | Python ≥ 3.10 with numpy, scipy (≥ 1.16), pandas, statsmodels, networkx, bctpy 0.6.1, matplotlib, seaborn, python-docx | SciPy 1.17.1, statsmodels 0.15.0, NetworkX 3.6.1 | all Python steps (`bash code/hipergator_tests/setup_python_env.sh` builds the environment) |
-| MATLAB (base, no toolboxes; most functions also run in Octave ≥ 7) | R2026a | HMM, DCC-GARCH, complex PCA (all mice) |
+| MATLAB (base, no toolboxes; most functions also run in Octave ≥ 7) | R2026a | HMM, DCC-GARCH, complex PCA (all scans) |
 | [HMM-MAR](https://github.com/OHBA-analysis/HMM-MAR) | see `code/hmm_v2/README.md` | HMM steps |
 | [Brain Connectivity Toolbox](https://sites.google.com/site/bctnet/) (MATLAB) | 2019-03-03 | HMM state networks |
 | [complex_pca](https://github.com/tsb46/complex_pca) (Bolt et al., 2022) | commit `d5ec42c`, used unchanged | group complex PCA (step 12) |
@@ -76,14 +76,14 @@ The code and the data sit in sibling folders:
 |---|---|---|---|---|
 | 0 | Tests on synthetic data | `code/` | `sbatch hipergator_tests/run_static_tests.sbatch`; `sbatch hipergator_tests/run_hmm_tests.sbatch` | — |
 | 1 | Preprocessing (optional): RABIES, with slice timing along the slice axis (Z, interleaved `alt+z`) | — | `optional_rabies_run/run_rabies_mice.sh` (see its README) | Methods, Image processing |
-| 2 | ROI-mean time series per mouse (needs `meta_data.csv`) | RABIES output folder | `code/organize_signals/organize_signals.m` | Methods, Static FC |
+| 2 | ROI-mean time series per scan (needs `meta_data.csv`) | RABIES output folder | `code/organize_signals/organize_signals.m` | Methods, Static FC |
 | 3 | Stack the 95 FC matrices | `code/static_v2/build_matrices/` | `build_merged_matrices.m` | — |
 | 4 | Static FC: edgewise Welch tests, graph metrics, NBS | `static/` | `python ../code/static_v2/full_analysis_abeta_mice_permutation_transitivity.py` (about 4 h; run as a 1-core job) | Figs 1–3 |
 | 5 | Nodal tables: node strength, clustering and nodal efficiency at 15% density | `static/` | `python ../code/static_v2/roi_group_table.py` (reads `fc_analysis_mice/node_metrics_by_density.csv` from step 4) | Results, nodal metrics |
 | 6 | Signal dimensionality (parallel analysis, Marchenko–Pastur) | `signals/` | `python mp_signal_rank.py --dataset mouse hmm_signals 95 2`; `python mp_signal_rank_group.py --dataset mouse_SE11T hmm_signals 95 2` | Supp Fig S1 |
 | 7 | HMM model selection: split-half reproducibility against phase and IAAFT surrogates | `signals/` | `IAAFT_MODELS="all" IAAFT_K="2:10" bash run_nulls_in_sequence.sh split`, then `python plot_hmm_splithalf_null.py` and `python select_screen_candidate.py` | Supp Fig S2 |
 | 8 | Reported HMM (Gaussian HMM on 25 PCs, K = 3): ten fits, choice of the reported fit, then metrics, state networks, bootstrap stability, statistics and figures | `code/` | `sbatch hipergator_tests/run_hmm_fits_array.sbatch primary`, then `sbatch hipergator_tests/run_select_fit.sbatch primary`, then `bash hipergator_tests/run_selected_fit.sh primary` | Figs 4–5; Supp Fig S3 |
-| 9 | DCC-GARCH and complex PCA (all mice) against each mouse's surrogates and stationary replicas | `signals/` | `sbatch slurm/dfc_quicktest.sbatch`, then `bash submit_dfc.sh` | — |
+| 9 | DCC-GARCH and complex PCA (all scans) against each scan's surrogates and stationary replicas | `signals/` | `sbatch slurm/dfc_quicktest.sbatch`, then `bash submit_dfc.sh` | — |
 | 10 | Dynamic-FC figures and group tests | `signals/` | `python plot_dfc_results.py --in_dir dfc_dcc_cpca` | Figs 6, 9; Supp Figs S5, S7 |
 | 11 | Example ρ(t) with the published DCC estimator | `code/` | `sbatch hipergator_tests/run_dcc_example.sbatch` | Supp Fig S4 |
 | 12 | Group complex PCA and traveling index (published code, unchanged; permutation tests with refits) | `<study>/` | `python code/cpca/python/cpca_group_lags.py --cpca_dir complex_pca --data_dir signals/hmm_signals --groups signals/dfc_dcc_cpca/dfc_subject_metrics.csv --roi_labels code/cpca/atlas/roi_labels.csv --n_perm 1000 --n_jobs 16 --out_dir signals/dfc_dcc_cpca/cpca_group_lags` | Figs 7–8 |

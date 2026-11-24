@@ -52,9 +52,9 @@ data that were high-passed only.
 
 ## Calibrated test: stationary replicas (phase null)
 
-Comparing each mouse with its own phase surrogates assumes that observed data
+Comparing each scan with its own phase surrogates assumes that observed data
 and surrogates are exchangeable when nothing is dynamic. That can fail in
-small ways, and across 95 mice a small per-mouse bias becomes "significant".
+small ways, and across 95 scans a small per-scan bias becomes "significant".
 On stationary simulated data, DCC leaned positive in every test run: mean rank
 0.54–0.60 against the 0.5 expected, and mean z about +0.5. None of these
 reached significance.

@@ -1,7 +1,7 @@
 # Complex PCA (cPCA): package for the paper
 
 Packaged 11 November 2026. This package holds the scripts, result tables and figures behind
-the complex PCA part of the dynamic functional connectivity paper (95 mice, 7 groups,
+the complex PCA part of the dynamic functional connectivity paper (95 scans from 78 mice, 7 groups,
 82 ROIs, TR = 2 s).
 
 Complex PCA is applied as published by Bolt et al. (2022), in the same way as the HMM
@@ -68,7 +68,7 @@ figures/               the figures as delivered (make_figures.sh rewrites them)
 
 | File | Step | What it does | Code source |
 |---|---|---|---|
-| `../dfc/run_dcc_cpca_null.m` | 1 | Runs complex PCA on all 95 mice, with the DCC/GARCH tests in the same run. Writes the loadings (`cpca_loadings_roi.csv`), per-mouse measures (`dfc_subject_metrics.csv`) and the cycle tables. | Ours; the method is Bolt et al. (2022) |
+| `../dfc/run_dcc_cpca_null.m` | 1 | Runs complex PCA on all 95 scans, with the DCC/GARCH tests in the same run. Writes the loadings (`cpca_loadings_roi.csv`), per-scan measures (`dfc_subject_metrics.csv`) and the cycle tables. | Ours; the method is Bolt et al. (2022) |
 | `../dfc/dfc_cpca_fit.m` | 1 | Group complex PCA: eigendecomposition of the pooled analytic-signal covariance. Each component is rotated so its largest ROI has phase 0. | Ours; the method is Bolt et al. (2022) |
 | `../dfc/dfc_cpca_subject_stats.m` | 1 | Per-mouse variance explained and frequency, computed on the group loadings (time courses = Z * V). | Ours |
 | `../dfc/dfc_analytic_signal.m` | 1 | Analytic signal via FFT; the same result as `hilbert()` without the Signal Processing Toolbox. | Standard method |

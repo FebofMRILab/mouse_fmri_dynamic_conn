@@ -45,7 +45,7 @@ Put these in the folder with `hmm_signals/`, together with your
 - `analyze_confirm_lowrank.py`
 - `mp_signal_rank.py`
 
-The defaults are the mouse cohort: 95 subjects, TR 2 s. For the human data,
+The defaults are the mouse cohort: 95 scans, TR 2 s. For the human data,
 set `HMM_N_SUBJECTS`, `HMM_TR`, `HMM_DATA_DIR` and `HMM_OUT_DIR`.
 
 ```bash
