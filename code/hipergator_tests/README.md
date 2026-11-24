@@ -50,7 +50,7 @@ Output goes to `hmm_v2_test_results/`:
 - `state_descriptor_tests.csv` (D1–D7: amplitude vs correlation pattern on simulated states)
 - `occupancy_drift_test.txt` and `occupancy_drift_workflow.txt`
 - `hodges_lehmann_test.txt` (H1–H9: the intervals and the K = 2 drift fix of the confirmation analysis)
-- `model_files_test.txt` (M1–M8: the job scripts read the two reported models from their files; stubs, nothing is fitted)
+- `model_files_test.txt` (M1–M8: the job scripts read the primary and secondary models from their files; stubs, nothing is fitted)
 
 ## 2. Static-FC tests (Python, about 15-30 min)
 
@@ -68,7 +68,7 @@ Then submit:
 sbatch hipergator_tests/run_static_tests.sbatch
 ```
 
-Output goes to `static_test_results/`. The same job also tests `hmm_py/` (about 6 min; includes runs for both reported models, and the agreement script, A1–A6) and `dfc/` if they are present.
+Output goes to `static_test_results/`. The same job also tests `hmm_py/` (about 6 min; includes runs for the primary and the secondary model, and the agreement script, A1–A6) and `dfc/` if they are present.
 
 The two jobs are independent and can run at the same time (2 cores in total).
 
@@ -107,7 +107,7 @@ bash hipergator_tests/run_selected_fit.sh secondary
 sbatch hipergator_tests/run_hmm_pipeline.sbatch
 ```
 
-On its own (without `SKIP_FIT=1`) it fits once and runs every step: the way to run an exploratory model (e.g. `--export=ALL,HMM_K=4,HMM_LOWRANK=15,HMM_PCA=0`; set all three, as unset ones come from `MODEL_PRIMARY.env`). For the reported models, use section 3 above. It runs on one core and stops at once if the signal folder is missing:
+On its own (without `SKIP_FIT=1`) it fits once and runs every step: the way to run an exploratory model (e.g. `--export=ALL,HMM_K=4,HMM_LOWRANK=15,HMM_PCA=0`; set all three, as unset ones come from `MODEL_PRIMARY.env`). For the primary model (reported) and the secondary model (not reported), use section 3 above. It runs on one core and stops at once if the signal folder is missing:
 1. run4e;
 2. the comparison with the confirmation's full fit;
 3. the drift test (Python);

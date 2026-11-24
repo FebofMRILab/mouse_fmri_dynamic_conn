@@ -9,7 +9,7 @@ These scripts read the outputs of the MATLAB steps in `hmm_v2/` for the chosen f
 | `brainnetwork_plotter_Rmigration_bin_transitivity.py` | run5 `graph_metrics_per_subject_per_state_density15.csv` | `<model folder>/hmm_graph_figures/` |
 | `hmm_bootstrap_stability_plotter.py` | run5B `bootstrap_stability_subject_state.csv` | `<model folder>/bootstrap_supplement/` |
 
-After both reported models' pipelines, `hmm_model_agreement.py` applies the agreement rule (`hmm_null/MODEL_SELECTION_RULE.md` amendment 2) and writes `<signals>/hmm_model_agreement/` (`state_pairing.csv`, `agreement_contrasts.csv`, `agreement_counts.csv`, `agreement_report.txt`). Test: `python tests/test_model_agreement.py` (A1–A6).
+After the primary and secondary models' pipelines (only the primary is reported in the paper), `hmm_model_agreement.py` applies the agreement rule (`hmm_null/MODEL_SELECTION_RULE.md` amendment 2) and writes `<signals>/hmm_model_agreement/` (`state_pairing.csv`, `agreement_contrasts.csv`, `agreement_counts.csv`, `agreement_report.txt`). Test: `python tests/test_model_agreement.py` (A1–A6).
 
 Shared files:
 - `hmm_model_selection.py`: which fit to read, and the fit-ID check.
@@ -36,6 +36,6 @@ For the secondary model by hand, set all three variables: `export HMM_K=2 HMM_LO
 cd hmm_py && python tests/test_hmm_python_stats.py
 ```
 
-This compares the updated and previous scripts on simulated data (K = 3, the K the previous scripts were written for), runs every script for both reported models, and checks the fit-ID guard, the defaults, the fit-selection scope and the K = 2 occupancy fix. `CHANGES.md` lists every change and its evidence.
+This compares the updated and previous scripts on simulated data (K = 3, the K the previous scripts were written for), runs every script for the primary and the secondary model, and checks the fit-ID guard, the defaults, the fit-selection scope and the K = 2 occupancy fix. `CHANGES.md` lists every change and its evidence.
 
 The ROI table that replaces `statistical_table.r` is `static_v2/roi_group_table.py`, with the static analysis.
